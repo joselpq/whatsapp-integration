@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-integration",
+  "version": "1.0.0",
+  "main": "test-whatsapp-api.js",
+  "scripts": {
+    "start": "node webhook-server.js",
+    "dev": "node webhook-server.js",
+    "test-send": "node test-whatsapp-api.js send",
+    "test-info": "node test-whatsapp-api.js info"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0"
+  }
+}
