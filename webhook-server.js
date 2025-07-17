@@ -19,7 +19,7 @@ const config = {
 };
 
 // In-memory storage for messages (replace with database later)
-const messages = [];
+const messageStore = [];
 const conversations = new Map();
 
 // Webhook verification endpoint (GET)
@@ -72,9 +72,9 @@ app.post('/webhook', (req, res) => {
 app.get('/api/messages', (req, res) => {
   const { userId, limit = 50, offset = 0 } = req.query;
   
-  let filteredMessages = messages;
+  let filteredMessages = messageStore;
   if (userId) {
-    filteredMessages = messages.filter(msg => msg.userId === userId);
+    filteredMessages = messageStore.filter(msg => msg.userId === userId);
   }
   
   const paginatedMessages = filteredMessages.slice(
@@ -159,7 +159,7 @@ function processMessages(value) {
         status: 'received'
       };
       
-      messages.push(storedMessage);
+      messageStore.push(storedMessage);
       
       // Update conversation window
       updateConversationWindow(userId, message.from);
@@ -173,9 +173,9 @@ function processMessages(value) {
     statuses.forEach(status => {
       console.log('📊 Status update:', status);
       // Update message status in storage
-      const message = messages.find(msg => msg.messageId === status.id);
-      if (message) {
-        message.status = status.status;
+      const storedMsg = messageStore.find(msg => msg.messageId === status.id);
+      if (storedMsg) {
+        storedMsg.status = status.status;
         console.log(`✅ Updated status for message ${status.id}: ${status.status}`);
       }
     });
@@ -197,7 +197,7 @@ function updateConversationWindow(userId, phoneNumber) {
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    messagesStored: messages.length,
+    messagesStored: messageStore.length,
     activeConversations: conversations.size,
     uptime: process.uptime()
   });
