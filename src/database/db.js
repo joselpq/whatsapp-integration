@@ -23,6 +23,8 @@ class Database {
   }
 
   async query(text, params) {
+    await this.ensureConnection();
+    
     if (!this.pool) {
       throw new Error('Database not configured');
     }
@@ -44,7 +46,24 @@ class Database {
   }
 
   async close() {
-    await this.pool.end();
+    if (this.pool) {
+      await this.pool.end();
+      // Reset pool to allow reconnection
+      this.pool = null;
+    }
+  }
+  
+  // Reconnect if pool was closed
+  async ensureConnection() {
+    if (!this.pool && process.env.DATABASE_URL) {
+      this.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+      });
+    }
   }
 }
 

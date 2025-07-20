@@ -41,7 +41,10 @@ async function setupDatabase() {
     console.error('❌ Database setup failed:', error);
     process.exit(1);
   } finally {
-    await db.close();
+    // Don't close the pool when running in the server
+    if (require.main === module) {
+      await db.close();
+    }
   }
 }
 

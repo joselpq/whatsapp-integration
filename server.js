@@ -30,26 +30,6 @@ const config = {
 // Initialize WhatsApp service
 const whatsappService = new WhatsAppService();
 
-// TEMPORARY: Database setup endpoint (REMOVE AFTER USE)
-app.get('/setup-database-once', async (req, res) => {
-  try {
-    console.log('Running database setup...');
-    const setupDb = require('./scripts/setup-db');
-    await setupDb();
-    res.json({ 
-      success: true, 
-      message: 'Database tables created successfully!',
-      warning: 'REMOVE THIS ENDPOINT FROM CODE'
-    });
-  } catch (error) {
-    console.error('Database setup failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
-  }
-});
-
 // Webhook verification endpoint (GET)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
