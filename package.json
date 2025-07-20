@@ -7,7 +7,10 @@
     "dev": "node server.js",
     "test-send": "node tools/test-whatsapp-api.js send",
     "test-info": "node tools/test-whatsapp-api.js info",
-    "db:setup": "node scripts/setup-db.js"
+    "db:setup": "node scripts/setup-db.js",
+    "db:setup-prod": "node setup-production-db.js",
+    "db:verify": "node scripts/verify-db-connection.js",
+    "test-flow": "node tools/test-flow.js"
   },
   "keywords": ["whatsapp", "api", "webhook", "financial", "assistant"],
   "author": "ZenMind Team",
