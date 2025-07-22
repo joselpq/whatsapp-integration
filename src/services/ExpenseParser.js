@@ -125,18 +125,51 @@ class ExpenseParser {
   static isExpenseMessage(message) {
     const text = message.toLowerCase();
     
-    // Check for money indicators
-    const moneyIndicators = [
-      /\d+[,\.]?\d*/,  // Numbers
+    // Check for income indicators (should NOT be expenses)
+    const incomeIndicators = [
+      /ganh/i,        // ganho, ganhei, ganhar
+      /receb/i,       // recebo, recebi, receber
+      /salário/i,
+      /sal[aá]rio/i,
+      /renda/i,
+      /fatur/i        // faturo, faturei
+    ];
+    
+    // If it's income, it's NOT an expense
+    if (incomeIndicators.some(indicator => indicator.test(text))) {
+      return false;
+    }
+    
+    // Check for expense indicators
+    const expenseIndicators = [
       /gastei/i,
       /comprei/i,
       /paguei/i,
-      /r\$/i,
-      /reais/i,
-      /real/i
+      /custou/i,
+      /saiu por/i
     ];
     
-    return moneyIndicators.some(indicator => indicator.test(text));
+    // Check for expense patterns
+    const hasExpenseWord = expenseIndicators.some(indicator => indicator.test(text));
+    const hasMoneyPattern = /\d+[,\.]?\d*/.test(text);
+    const hasLocation = /\s+(no|na|em)\s+/i.test(text);
+    
+    // Transport/service patterns: "uber 15", "taxi 20", "gasolina 50"
+    const transportServices = ['uber', '99', 'taxi', 'táxi', 'ônibus', 'metro', 'metrô'];
+    const hasTransportService = transportServices.some(service => 
+      new RegExp(`\\b${service}\\b`, 'i').test(text)
+    );
+    
+    // Product patterns: "gasolina 30", "remédio 45"
+    const commonProducts = ['gasolina', 'combustível', 'remédio', 'café', 'lanche'];
+    const hasProduct = commonProducts.some(product => 
+      new RegExp(`\\b${product}\\b`, 'i').test(text)
+    );
+    
+    return hasExpenseWord || 
+           (hasMoneyPattern && hasLocation) || 
+           (hasMoneyPattern && hasTransportService) ||
+           (hasMoneyPattern && hasProduct);
   }
   
   // Format expense for confirmation message

@@ -6,6 +6,7 @@ const Expense = require('../models/Expense');
 const UserContext = require('../models/UserContext');
 const ArnaldoAI = require('./ArnaldoAI');
 const ExpenseParser = require('./ExpenseParser');
+const IncomeParser = require('./IncomeParser');
 
 class WhatsAppService {
   constructor() {
@@ -251,6 +252,28 @@ class WhatsAppService {
       // Build user context for AI
       const context = await UserContext.build(user.id);
       
+      // Check if it's an income message first
+      if (IncomeParser.isIncomeMessage(messageText)) {
+        const income = IncomeParser.parse(messageText);
+        
+        if (income) {
+          // Update user's monthly income
+          await this.updateUserIncome(user.id, income.amount);
+          
+          const aiResponse = await this.arnaldo.processMessage(
+            `User told me their monthly income is R$${income.amount.toFixed(2)}. Acknowledge this and ask what help they need with budgeting.`,
+            context
+          );
+          await this.sendMessage(user.phone_number, aiResponse);
+          
+          await this.trackEvent(user.id, 'income_updated', {
+            amount: income.amount
+          });
+          
+          return;
+        }
+      }
+      
       // Check if it's an expense message
       if (ExpenseParser.isExpenseMessage(messageText)) {
         const expense = ExpenseParser.parse(messageText);
@@ -268,12 +291,11 @@ class WhatsAppService {
           const updatedContext = await UserContext.build(user.id);
           
           // Generate AI response about the expense
-          const prompt = `User just logged an expense: ${expense.description} for R$${expense.amount.toFixed(2)} in category ${expense.category}. 
-          Today's total: R$${updatedContext.expenses.todayTotal.toFixed(2)}
+          const prompt = `User logged expense: ${expense.description} R$${expense.amount.toFixed(2)} (${expense.category}). 
+          Today total: R$${updatedContext.expenses.todayTotal.toFixed(2)}
           Daily budget: R$${updatedContext.expenses.dailyBudget.toFixed(2)}
-          Remaining: R$${updatedContext.expenses.remainingToday.toFixed(2)}
           
-          Acknowledge the expense and provide brief feedback based on their budget.`;
+          Give brief feedback on this expense.`;
           
           const aiResponse = await this.arnaldo.processMessage(prompt, updatedContext);
           await this.sendMessage(user.phone_number, aiResponse);
@@ -288,7 +310,7 @@ class WhatsAppService {
         }
       }
       
-      // For non-expense messages, use general AI processing
+      // For general messages, use AI processing
       const aiResponse = await this.arnaldo.processMessage(messageText, context);
       await this.sendMessage(user.phone_number, aiResponse);
       
@@ -304,6 +326,19 @@ class WhatsAppService {
       // Fallback message
       const fallbackMessage = 'Oi! Tive um probleminha técnico aqui 😅 Pode repetir sua mensagem? Prometo que vou te ajudar!';
       await this.sendMessage(user.phone_number, fallbackMessage);
+    }
+  }
+  
+  async updateUserIncome(userId, monthlyIncome) {
+    try {
+      const query = `
+        UPDATE users 
+        SET monthly_income = $2
+        WHERE id = $1
+      `;
+      await require('../database/db').query(query, [userId, monthlyIncome]);
+    } catch (error) {
+      console.error('Error updating user income:', error);
     }
   }
   
