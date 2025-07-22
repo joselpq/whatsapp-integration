@@ -2,6 +2,10 @@ const axios = require('axios');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
+const Expense = require('../models/Expense');
+const UserContext = require('../models/UserContext');
+const ArnaldoAI = require('./ArnaldoAI');
+const ExpenseParser = require('./ExpenseParser');
 
 class WhatsAppService {
   constructor() {
@@ -10,6 +14,7 @@ class WhatsAppService {
     this.businessNumber = process.env.BUSINESS_PHONE_NUMBER || '+5511939041011';
     this.apiVersion = 'v18.0';
     this.baseUrl = `https://graph.facebook.com/${this.apiVersion}`;
+    this.arnaldo = new ArnaldoAI();
   }
 
   async sendMessage(to, content, options = {}) {
@@ -241,27 +246,76 @@ class WhatsAppService {
 
   async processAndRespond(user, conversation, message) {
     try {
-      // Basic auto-response logic (will be replaced by AI later)
-      const messageText = message.text?.body?.toLowerCase() || '';
+      const messageText = message.text?.body || '';
       
-      let responseText = '';
-    
-    if (messageText.includes('oi') || messageText.includes('olá') || messageText.includes('hello')) {
-      responseText = `Oi! Sou o Arnaldo, seu assistente financeiro pessoal 🌟\n\nVou te ajudar a organizar suas finanças em 3 passos simples:\n\n1️⃣ Entender sua situação atual\n2️⃣ Definir suas metas\n3️⃣ Criar um plano personalizado\n\nVamos começar? Me conta: qual sua maior preocupação com dinheiro hoje?`;
-    } else if (messageText.includes('help') || messageText.includes('ajuda')) {
-      responseText = `Posso te ajudar com:\n\n💰 Controle de gastos\n📊 Planejamento financeiro\n🎯 Metas de economia\n📱 Dicas personalizadas\n\nO que você gostaria de saber?`;
-    } else if (messageText.includes('obrigad') || messageText.includes('valeu')) {
-      responseText = `De nada! Estou aqui para te ajudar sempre que precisar 😊\n\nLembre-se: pequenos passos levam a grandes conquistas financeiras!`;
-    } else {
-      responseText = `Entendi! Você disse: "${message.text?.body}"\n\nEstou aqui para te ajudar com suas finanças. Pode me contar mais sobre sua situação financeira atual?`;
-    }
-
-      // Send response
-      await this.sendMessage(user.phone_number, responseText);
+      // Build user context for AI
+      const context = await UserContext.build(user.id);
+      
+      // Check if it's an expense message
+      if (ExpenseParser.isExpenseMessage(messageText)) {
+        const expense = ExpenseParser.parse(messageText);
+        
+        if (expense) {
+          // Save expense to database
+          await Expense.create({
+            userId: user.id,
+            amount: expense.amount,
+            category: expense.category,
+            description: expense.description
+          });
+          
+          // Get updated expense context
+          const updatedContext = await UserContext.build(user.id);
+          
+          // Generate AI response about the expense
+          const prompt = `User just logged an expense: ${expense.description} for R$${expense.amount.toFixed(2)} in category ${expense.category}. 
+          Today's total: R$${updatedContext.expenses.todayTotal.toFixed(2)}
+          Daily budget: R$${updatedContext.expenses.dailyBudget.toFixed(2)}
+          Remaining: R$${updatedContext.expenses.remainingToday.toFixed(2)}
+          
+          Acknowledge the expense and provide brief feedback based on their budget.`;
+          
+          const aiResponse = await this.arnaldo.processMessage(prompt, updatedContext);
+          await this.sendMessage(user.phone_number, aiResponse);
+          
+          // Track analytics
+          await this.trackEvent(user.id, 'expense_logged', {
+            amount: expense.amount,
+            category: expense.category
+          });
+          
+          return;
+        }
+      }
+      
+      // For non-expense messages, use general AI processing
+      const aiResponse = await this.arnaldo.processMessage(messageText, context);
+      await this.sendMessage(user.phone_number, aiResponse);
+      
+      // Track message interaction
+      await this.trackEvent(user.id, 'message_sent', {
+        hasIncome: context.profile?.monthly_income ? true : false,
+        isOnboarded: context.profile?.onboarding_completed || false
+      });
       
     } catch (error) {
       console.error('Error in processAndRespond:', error);
-      // Don't throw - we don't want to crash the webhook handler
+      
+      // Fallback message
+      const fallbackMessage = 'Oi! Tive um probleminha técnico aqui 😅 Pode repetir sua mensagem? Prometo que vou te ajudar!';
+      await this.sendMessage(user.phone_number, fallbackMessage);
+    }
+  }
+  
+  async trackEvent(userId, eventName, properties = {}) {
+    try {
+      const query = `
+        INSERT INTO analytics_events (user_id, event_name, properties)
+        VALUES ($1, $2, $3)
+      `;
+      await require('../database/db').query(query, [userId, eventName, properties]);
+    } catch (error) {
+      console.error('Error tracking event:', error);
     }
   }
 }

@@ -4,7 +4,8 @@ function validateConfig() {
     'TEST_ACCESS_TOKEN',
     'TEST_PHONE_NUMBER_ID',
     'WEBHOOK_VERIFY_TOKEN',
-    'META_APP_SECRET'
+    'META_APP_SECRET',
+    'OPENAI_API_KEY'
   ];
   
   const missing = required.filter(key => !process.env[key]);

@@ -10,9 +10,16 @@
     "db:setup": "node scripts/setup-db.js",
     "db:setup-prod": "node setup-production-db.js",
     "db:verify": "node scripts/verify-db-connection.js",
-    "test-flow": "node tools/test-flow.js"
+    "test-flow": "node tools/test-flow.js",
+    "db:add-financial": "node scripts/add-financial-tables.js"
   },
-  "keywords": ["whatsapp", "api", "webhook", "financial", "assistant"],
+  "keywords": [
+    "whatsapp",
+    "api",
+    "webhook",
+    "financial",
+    "assistant"
+  ],
   "author": "ZenMind Team",
   "license": "UNLICENSED",
   "description": "WhatsApp Business API integration service for ZenMind Financial Assistant",
@@ -20,6 +27,7 @@
     "axios": "^1.10.0",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
+    "openai": "^5.10.1",
     "pg": "^8.16.3",
     "uuid": "^11.1.0"
   }
