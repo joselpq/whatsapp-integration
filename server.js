@@ -93,6 +93,27 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
       res.json({ error: error.message });
     }
   });
+  
+  // Run database migration
+  app.post('/dev/migrate-states', async (req, res) => {
+    const migrate = require('./scripts/add-user-states');
+    
+    try {
+      console.log('🔄 Starting migration from API endpoint...');
+      await migrate();
+      res.json({ 
+        success: true, 
+        message: 'User states migration completed successfully',
+        warning: 'REMOVE THIS ENDPOINT BEFORE PRODUCTION'
+      });
+    } catch (error) {
+      console.error('Migration error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
 }
 
 // Webhook verification endpoint (GET)
