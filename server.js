@@ -58,6 +58,41 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     const users = await DevTools.listRecentUsers();
     res.json(users);
   });
+  
+  // Debug user state flow
+  app.get('/dev/debug-state/:phoneNumber', async (req, res) => {
+    const { phoneNumber } = req.params;
+    const ConversationState = require('./src/services/ConversationState');
+    const User = require('./src/models/User');
+    
+    try {
+      const user = await User.findByPhoneNumber(phoneNumber);
+      if (!user) {
+        return res.json({ error: 'User not found' });
+      }
+      
+      const userState = await ConversationState.getUserState(user.id);
+      const needsGuidance = await ConversationState.needsGuidance(user.id);
+      
+      const now = Date.now();
+      const createdAt = new Date(user.created_at).getTime();
+      const diffMinutes = (now - createdAt) / (1000 * 60);
+      const isNewUser = !user.onboarding_completed && diffMinutes < 5;
+      
+      res.json({
+        userId: user.id,
+        phoneNumber: user.phone_number,
+        onboardingCompleted: user.onboarding_completed,
+        createdAt: user.created_at,
+        timeDiffMinutes: diffMinutes,
+        isNewUser,
+        userState,
+        needsGuidance
+      });
+    } catch (error) {
+      res.json({ error: error.message });
+    }
+  });
 }
 
 // Webhook verification endpoint (GET)
