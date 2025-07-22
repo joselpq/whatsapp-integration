@@ -30,6 +30,36 @@ const config = {
 // Initialize WhatsApp service
 const whatsappService = new WhatsAppService();
 
+// DEVELOPMENT ENDPOINTS (REMOVE IN PRODUCTION)
+if (process.env.NODE_ENV !== 'production') {
+  const DevTools = require('./src/utils/dev-tools');
+  
+  // Reset user for testing
+  app.post('/dev/reset-user', async (req, res) => {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'phoneNumber is required' });
+    }
+    
+    const result = await DevTools.resetUser(phoneNumber);
+    res.json(result);
+  });
+  
+  // Get user status
+  app.get('/dev/user-status/:phoneNumber', async (req, res) => {
+    const { phoneNumber } = req.params;
+    const result = await DevTools.getUserStatus(phoneNumber);
+    res.json(result);
+  });
+  
+  // List recent users
+  app.get('/dev/users', async (req, res) => {
+    const users = await DevTools.listRecentUsers();
+    res.json(users);
+  });
+}
+
 // Webhook verification endpoint (GET)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];

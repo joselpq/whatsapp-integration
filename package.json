@@ -11,7 +11,10 @@
     "db:setup-prod": "node setup-production-db.js",
     "db:verify": "node scripts/verify-db-connection.js",
     "test-flow": "node tools/test-flow.js",
-    "db:add-financial": "node scripts/add-financial-tables.js"
+    "db:add-financial": "node scripts/add-financial-tables.js",
+    "test": "node tests/integration/onboarding-test.js",
+    "test:performance": "node tests/load/performance-test.js",
+    "test:all": "npm test && npm run test:performance"
   },
   "keywords": [
     "whatsapp",
