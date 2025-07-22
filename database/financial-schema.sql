@@ -93,8 +93,9 @@ CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_created 
   ON messages(conversation_id, created_at DESC);
 
+-- Create a simple index on expense_date instead of using DATE_TRUNC
 CREATE INDEX IF NOT EXISTS idx_expenses_user_month 
-  ON expenses(user_id, DATE_TRUNC('month', expense_date));
+  ON expenses(user_id, expense_date);
 
 -- Helper functions
 CREATE OR REPLACE FUNCTION update_daily_summary()
