@@ -265,11 +265,7 @@ class WhatsAppService {
         // Send structured onboarding message
         await this.sendMessage(user.phone_number, onboardingResponse.message);
         
-        // Update state if needed
-        if (onboardingResponse.nextState) {
-          await ConversationState.updateUserState(user.id, onboardingResponse.nextState);
-        }
-        
+        // State updates are now handled inside OnboardingFlow
         // Complete onboarding if done
         if (onboardingResponse.completeOnboarding) {
           await ConversationState.completeOnboarding(user.id);
@@ -297,7 +293,7 @@ class WhatsAppService {
           
           // If in onboarding, move to next step
           if (userState === ConversationState.STATES.INCOME_COLLECTION) {
-            const response = OnboardingFlow.handleIncomeCollection(user.id, messageText);
+            const response = await OnboardingFlow.handleIncomeCollection(user.id, messageText);
             await this.sendMessage(user.phone_number, response.message);
             
             if (response.completeOnboarding) {

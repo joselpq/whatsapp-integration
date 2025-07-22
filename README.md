@@ -6,9 +6,12 @@ WhatsApp Business API integration for ZenMind Financial Assistant - providing au
 
 - ✅ **WhatsApp Webhook Integration** - Receives and processes messages in real-time
 - ✅ **PostgreSQL Database** - Persistent storage for users, conversations, and messages
+- ✅ **Persistent State Management** - Reliable conversation state tracking
+- ✅ **Structured Onboarding Flow** - Goal-first user journey
+- ✅ **AI Financial Advisor (Arnaldo)** - OpenAI-powered financial guidance
+- ✅ **Expense & Income Tracking** - Natural language processing
 - ✅ **24-Hour Conversation Window** - Automatic tracking and management
 - ✅ **Template/Free Message Routing** - Intelligent message type selection
-- ✅ **Auto-responses** - Basic Arnaldo personality responses
 - ✅ **Security** - Request signature verification
 - ✅ **Health Monitoring** - Database and service health checks
 
@@ -32,8 +35,10 @@ WhatsApp Business API integration for ZenMind Financial Assistant - providing au
 
 3. **Database setup:**
    ```bash
-   npm run db:setup      # Local development
-   npm run db:setup-prod # Production (Railway)
+   npm run db:setup           # Local development
+   npm run db:setup-prod      # Production (Railway)
+   npm run db:add-financial   # Add financial tables
+   node scripts/add-user-states.js  # Add state persistence
    ```
 
 4. **Run locally:**
@@ -61,8 +66,14 @@ PORT=3000
 # Database (automatically provided by Railway)
 DATABASE_URL=postgresql://...
 
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+
 # Business Configuration
 BUSINESS_PHONE_NUMBER=+5511939041011
+
+# Development Tools (temporary)
+DEV_TOOLS_ENABLED=true
 ```
 
 ## 📡 API Endpoints
@@ -87,13 +98,20 @@ BUSINESS_PHONE_NUMBER=+5511939041011
 ### Conversation API
 - `GET /api/v1/conversations/status/:phone` - Check conversation window status
 
-## 🤖 Current Auto-responses
+## 🤖 Arnaldo - AI Financial Assistant
 
-Arnaldo responds to these keywords:
-- **Greetings** ("oi", "olá", "hello") → Introduction and 3-step plan
-- **Help** ("help", "ajuda") → Lists available services
-- **Thanks** ("obrigado", "valeu") → Motivational response
-- **Default** → Echoes message and asks about finances
+### Onboarding Flow
+1. **Welcome** → User sends "Oi"
+2. **Goal Discovery** → Select financial priority (1-4)
+3. **Income Collection** → Share monthly income
+4. **Active Tracking** → Start logging expenses
+
+### Conversation Capabilities
+- **Expense Tracking**: "gastei 50 no mercado"
+- **Income Updates**: "ganho 3000 por mês"
+- **Financial Advice**: AI-powered contextual guidance
+- **Goal Management**: Track progress toward objectives
+- **Emergency Mode**: Crisis detection and support
 
 ## 🚀 Deployment
 
@@ -127,8 +145,26 @@ npm run test-send
 # Test complete flow
 npm run test-flow
 
+# Test onboarding flow
+npm test
+
+# Performance tests
+npm run test:performance
+
+# Test state persistence
+node tests/test-state-persistence.js
+
 # Verify database connection
 npm run db:verify
+```
+
+### Development Tools
+```bash
+# Reset user for testing (dev only)
+node tools/reset-user.js +5511999999999
+
+# Debug user state
+curl https://your-app.up.railway.app/dev/debug-state/5511999999999
 ```
 
 ### Manual Testing
@@ -139,10 +175,17 @@ npm run db:verify
 
 ## 📊 Database Schema
 
+### Core Tables
 - **users** - WhatsApp users with profile data
+- **user_states** - Persistent conversation state tracking
 - **conversations** - Tracks 24-hour windows
 - **messages** - Complete message history
-- **phone_numbers** - Business phone configurations
+
+### Financial Tables
+- **goals** - User financial objectives
+- **expenses** - Tracked spending
+- **financial_profiles** - Income and budget data
+- **analytics_events** - User behavior tracking
 
 ## 🔐 Security
 
@@ -161,18 +204,47 @@ whatsapp-integration/
 │   ├── database/         # Database connection
 │   ├── models/           # Data models
 │   ├── services/         # Business logic
-│   └── whatsapp/         # WhatsApp API client
-├── scripts/              # Setup and utility scripts
-├── tools/                # Testing tools
+│   │   ├── WhatsAppService.js    # Message routing
+│   │   ├── ConversationState.js  # State management
+│   │   └── ArnaldoAI.js          # OpenAI integration
+│   ├── flows/            # Conversation flows
+│   │   └── OnboardingFlow.js     # User onboarding
+│   ├── parsers/          # Natural language parsing
+│   └── utils/            # Utilities
+├── scripts/              # Setup and migration scripts
+├── tests/                # Test suites
+├── tools/                # Development tools
 └── database/             # SQL schemas
 ```
 
-## 🚧 Next Steps
+## 🏗️ Architecture
 
-- [ ] Integrate AI for intelligent financial advice
-- [ ] Add more WhatsApp message templates
-- [ ] Implement conversation analytics
-- [ ] Add rate limiting and quota management
+The system follows a 3-team bounded context architecture:
+
+1. **Conversation Platform** - WhatsApp integration, state management
+2. **Financial Intelligence** - Onboarding, tracking, AI advice
+3. **Growth & Analytics** - Insights, engagement, emergency support
+
+See `ARCHITECTURE.md` for detailed design.
+
+## 🚧 Roadmap
+
+### Week 2 (Current)
+- [x] Persistent state management
+- [x] Structured onboarding flow
+- [ ] Goal definition wizard
+- [ ] Income-scaled recommendations
+- [ ] Daily check-ins
+
+### Week 3
+- [ ] Emergency planner
+- [ ] Financial insights generator
+- [ ] Proactive engagement
+
+### Week 4
+- [ ] Analytics dashboard
+- [ ] Performance monitoring
+- [ ] Launch to 100 beta users
 
 ## 📞 Support
 

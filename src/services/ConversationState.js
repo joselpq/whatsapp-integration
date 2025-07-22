@@ -25,7 +25,28 @@ class ConversationState {
 
   static async getUserState(userId) {
     try {
-      // Check if user has completed onboarding
+      // First check persisted state
+      const stateQuery = `
+        SELECT current_state, context, updated_at
+        FROM user_states 
+        WHERE user_id = $1
+      `;
+      const stateResult = await db.query(stateQuery, [userId]);
+      
+      if (stateResult.rows.length > 0) {
+        const { current_state, context, updated_at } = stateResult.rows[0];
+        
+        // Check for emergency mode regardless of stored state
+        const emergencyCheck = await this.checkEmergencyMode(userId);
+        if (emergencyCheck && current_state !== this.STATES.EMERGENCY_MODE) {
+          await this.updateUserState(userId, this.STATES.EMERGENCY_MODE, { trigger: 'emergency_detected' });
+          return this.STATES.EMERGENCY_MODE;
+        }
+        
+        return current_state;
+      }
+      
+      // No persisted state - determine from user data (backward compatibility)
       const userQuery = `
         SELECT 
           onboarding_completed,
@@ -41,26 +62,31 @@ class ConversationState {
         return this.STATES.NEW_USER;
       }
 
-      // If just created (less than 5 minutes) and no onboarding
+      // New user - set initial state
       const isNewUser = !user.onboarding_completed && 
         (Date.now() - new Date(user.created_at).getTime()) < 5 * 60 * 1000;
 
       if (isNewUser) {
+        await this.updateUserState(userId, this.STATES.ONBOARDING_WELCOME, { source: 'new_user' });
         return this.STATES.ONBOARDING_WELCOME;
       }
 
       // Check for emergency keywords in recent messages
       const emergencyCheck = await this.checkEmergencyMode(userId);
       if (emergencyCheck) {
+        await this.updateUserState(userId, this.STATES.EMERGENCY_MODE, { trigger: 'emergency_detected' });
         return this.STATES.EMERGENCY_MODE;
       }
 
-      // If onboarding not completed, continue onboarding
+      // If onboarding not completed, determine step
       if (!user.onboarding_completed) {
-        return await this.getOnboardingStep(userId);
+        const state = await this.getOnboardingStep(userId);
+        await this.updateUserState(userId, state, { source: 'onboarding_step' });
+        return state;
       }
 
       // Normal active user
+      await this.updateUserState(userId, this.STATES.ACTIVE_TRACKING, { source: 'active_user' });
       return this.STATES.ACTIVE_TRACKING;
 
     } catch (error) {
@@ -145,33 +171,71 @@ class ConversationState {
     }
   }
 
-  static async updateUserState(userId, state, metadata = {}) {
+  static async updateUserState(userId, newState, context = {}) {
     try {
-      // Store state in user metadata or separate table
-      const query = `
-        UPDATE users 
-        SET updated_at = NOW()
-        WHERE id = $1
+      // Get current state for transition tracking
+      const currentStateQuery = `
+        SELECT current_state FROM user_states WHERE user_id = $1
       `;
-      await db.query(query, [userId]);
-
+      const currentResult = await db.query(currentStateQuery, [userId]);
+      const previousState = currentResult.rows[0]?.current_state || null;
+      
+      // Update or insert state
+      const query = `
+        INSERT INTO user_states (user_id, current_state, previous_state, context)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id) DO UPDATE SET
+          previous_state = user_states.current_state,
+          current_state = EXCLUDED.current_state,
+          context = user_states.context || EXCLUDED.context,
+          updated_at = NOW()
+        RETURNING *
+      `;
+      
+      const result = await db.query(query, [
+        userId, 
+        newState, 
+        previousState, 
+        JSON.stringify(context)
+      ]);
+      
       // Log state transition for analytics
+      await this.trackStateTransition(userId, previousState, newState, context);
+      
+      console.log(`📊 State updated: ${userId} ${previousState} → ${newState}`);
+      
+      return result.rows[0];
+      
+    } catch (error) {
+      console.error('Error updating user state:', error);
+      throw error;
+    }
+  }
+  
+  static async trackStateTransition(userId, fromState, toState, context = {}) {
+    try {
       const analyticsQuery = `
         INSERT INTO analytics_events (user_id, event_name, properties)
         VALUES ($1, 'state_transition', $2)
       `;
       await db.query(analyticsQuery, [
         userId,
-        { from: metadata.from, to: state, timestamp: new Date() }
+        { 
+          from: fromState, 
+          to: toState, 
+          context,
+          timestamp: new Date().toISOString() 
+        }
       ]);
-
     } catch (error) {
-      console.error('Error updating user state:', error);
+      console.error('Error tracking state transition:', error);
+      // Don't throw - analytics shouldn't break core flow
     }
   }
 
   static async completeOnboarding(userId) {
     try {
+      // Update user record
       const query = `
         UPDATE users 
         SET onboarding_completed = TRUE,
@@ -180,13 +244,17 @@ class ConversationState {
       `;
       await db.query(query, [userId]);
 
+      // Update state to active tracking
       await this.updateUserState(userId, this.STATES.ACTIVE_TRACKING, {
-        from: 'onboarding',
-        completed: true
+        onboarding_completed: true,
+        completed_at: new Date().toISOString()
       });
+
+      console.log(`✅ Onboarding completed for user ${userId}`);
 
     } catch (error) {
       console.error('Error completing onboarding:', error);
+      throw error;
     }
   }
 
@@ -204,6 +272,33 @@ class ConversationState {
     ];
 
     return guidanceStates.includes(state);
+  }
+  
+  // Get state context for a user
+  static async getStateContext(userId) {
+    try {
+      const query = `
+        SELECT current_state, previous_state, context, updated_at
+        FROM user_states
+        WHERE user_id = $1
+      `;
+      const result = await db.query(query, [userId]);
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      const row = result.rows[0];
+      return {
+        currentState: row.current_state,
+        previousState: row.previous_state,
+        context: row.context || {},
+        lastUpdated: row.updated_at
+      };
+    } catch (error) {
+      console.error('Error getting state context:', error);
+      return null;
+    }
   }
 }
 

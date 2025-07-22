@@ -9,7 +9,7 @@ class OnboardingFlow {
     switch (userState) {
       case ConversationState.STATES.NEW_USER:
       case ConversationState.STATES.ONBOARDING_WELCOME:
-        return this.sendWelcome();
+        return this.sendWelcome(userId);
         
       case ConversationState.STATES.GOAL_DISCOVERY:
         return this.handleGoalDiscovery(userId, messageText);
@@ -21,11 +21,18 @@ class OnboardingFlow {
         return this.handlePlanCreation(userId);
         
       default:
-        return this.sendWelcome();
+        return this.sendWelcome(userId);
     }
   }
   
-  static sendWelcome() {
+  static async sendWelcome(userId) {
+    // Update state to goal discovery for next message
+    await ConversationState.updateUserState(
+      userId, 
+      ConversationState.STATES.GOAL_DISCOVERY,
+      { stage: 'welcome_shown' }
+    );
+    
     return {
       message: `Oi! Sou o Arnaldo, seu consultor financeiro pessoal! 👋
 
@@ -38,8 +45,7 @@ Primeiro, me conta: qual é seu MAIOR objetivo financeiro agora?
 3️⃣ Quitar dívidas
 4️⃣ Aumentar minha renda
 
-Responde só o número da sua prioridade!`,
-      nextState: ConversationState.STATES.GOAL_DISCOVERY
+Responde só o número da sua prioridade!`
     };
   }
   
@@ -86,30 +92,47 @@ Só responde o número!`,
     
     // Create goal in database
     try {
-      await Goal.create({
+      const goal = await Goal.create({
         userId,
         type: goalType,
         name: goalType.replace('_', ' '),
         targetAmount: 1000, // Will be updated based on follow-up
         targetDate: null
       });
+      
+      // Update state to income collection
+      await ConversationState.updateUserState(
+        userId, 
+        ConversationState.STATES.INCOME_COLLECTION,
+        { 
+          goalType,
+          goalId: goal.id,
+          stage: 'goal_selected' 
+        }
+      );
     } catch (error) {
       console.log('Goal creation skipped (testing mode):', error.message);
+      // Still update state even if goal creation fails
+      await ConversationState.updateUserState(
+        userId, 
+        ConversationState.STATES.INCOME_COLLECTION,
+        { goalType, stage: 'goal_selected' }
+      );
     }
     
     return {
       message: `${goalMessage}
 
-${followUpMessage}`,
-      nextState: ConversationState.STATES.INCOME_COLLECTION
+${followUpMessage}`
     };
   }
   
-  static handleIncomeCollection(userId, messageText) {
+  static async handleIncomeCollection(userId, messageText) {
     // This will be handled by the IncomeParser in the main flow
     // But we need to provide guidance
     
     if (!messageText.match(/\d+/)) {
+      // No number found - ask again
       return {
         message: `Para criar seu plano personalizado, preciso saber quanto você ganha por mês.
 
@@ -117,12 +140,12 @@ Me fala seu salário ou renda mensal. Por exemplo:
 "Ganho 2500 por mês"
 "Meu salário é 3000"
 
-Pode ficar tranquilo, essa info fica só entre nós! 🔒`,
-        nextState: ConversationState.STATES.INCOME_COLLECTION
+Pode ficar tranquilo, essa info fica só entre nós! 🔒`
       };
     }
     
-    // If they provided a number, guide to next step
+    // If they provided a number, this will be handled by IncomeParser
+    // The response here is just fallback
     return {
       message: `Perfeito! Agora vamos entender seus gastos.
 
@@ -134,7 +157,6 @@ Nos próximos dias, me manda suas despesas assim:
 Depois de alguns dias, vou criar seu plano financeiro completo! 📊
 
 Por enquanto, qual seu gasto mais pesado do mês?`,
-      nextState: ConversationState.STATES.ACTIVE_TRACKING,
       completeOnboarding: true
     };
   }
@@ -155,6 +177,9 @@ Por enquanto, qual seu gasto mais pesado do mês?`,
     const monthlySavings = Math.round(income * 0.2); // 20% savings rate
     const dailyBudget = Math.round((income * 0.6) / 30); // 60% for variable expenses
     
+    // Complete onboarding and move to active tracking
+    await ConversationState.completeOnboarding(userId);
+    
     return {
       message: `🎯 SEU PLANO FINANCEIRO PERSONALIZADO
 
@@ -167,7 +192,6 @@ Com renda de R$${income.toLocaleString('pt-BR')}:
 Vamos começar! Me manda seus gastos que eu acompanho tudo.
 
 Primeira meta: economizar R$${Math.round(monthlySavings/4)} esta semana! 🚀`,
-      nextState: ConversationState.STATES.ACTIVE_TRACKING,
       completeOnboarding: true
     };
   }
