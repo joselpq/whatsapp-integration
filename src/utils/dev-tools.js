@@ -33,7 +33,7 @@ class DevTools {
       await db.query('DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)', [userId]);
       await db.query('DELETE FROM conversations WHERE user_id = $1', [userId]);
       
-      // Reset user profile to defaults
+      // Reset user profile to defaults and reset created_at to be treated as new user
       await db.query(`
         UPDATE users 
         SET 
@@ -43,6 +43,7 @@ class DevTools {
           onboarding_completed = FALSE,
           premium_subscriber = FALSE,
           premium_started_at = NULL,
+          created_at = NOW(),
           updated_at = NOW()
         WHERE id = $1
       `, [userId]);
