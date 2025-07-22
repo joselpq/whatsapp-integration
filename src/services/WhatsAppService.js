@@ -7,6 +7,8 @@ const UserContext = require('../models/UserContext');
 const ArnaldoAI = require('./ArnaldoAI');
 const ExpenseParser = require('./ExpenseParser');
 const IncomeParser = require('./IncomeParser');
+const ConversationState = require('./ConversationState');
+const OnboardingFlow = require('../flows/OnboardingFlow');
 
 class WhatsAppService {
   constructor() {
@@ -249,19 +251,64 @@ class WhatsAppService {
     try {
       const messageText = message.text?.body || '';
       
-      // Build user context for AI
+      // 1. Determine user's conversation state
+      const userState = await ConversationState.getUserState(user.id);
+      
+      // 2. Handle onboarding flow first
+      if (await ConversationState.needsGuidance(user.id)) {
+        const onboardingResponse = await OnboardingFlow.handleOnboarding(
+          user.id, 
+          userState, 
+          messageText
+        );
+        
+        // Send structured onboarding message
+        await this.sendMessage(user.phone_number, onboardingResponse.message);
+        
+        // Update state if needed
+        if (onboardingResponse.nextState) {
+          await ConversationState.updateUserState(user.id, onboardingResponse.nextState);
+        }
+        
+        // Complete onboarding if done
+        if (onboardingResponse.completeOnboarding) {
+          await ConversationState.completeOnboarding(user.id);
+        }
+        
+        return;
+      }
+      
+      // 3. Handle emergency mode
+      if (userState === ConversationState.STATES.EMERGENCY_MODE) {
+        const emergencyResponse = OnboardingFlow.getEmergencyResponse();
+        await this.sendMessage(user.phone_number, emergencyResponse.message);
+        return;
+      }
+      
+      // 4. Build user context for normal operations
       const context = await UserContext.build(user.id);
       
-      // Check if it's an income message first
+      // 5. Check if it's an income message
       if (IncomeParser.isIncomeMessage(messageText)) {
         const income = IncomeParser.parse(messageText);
         
         if (income) {
-          // Update user's monthly income
           await this.updateUserIncome(user.id, income.amount);
           
+          // If in onboarding, move to next step
+          if (userState === ConversationState.STATES.INCOME_COLLECTION) {
+            const response = OnboardingFlow.handleIncomeCollection(user.id, messageText);
+            await this.sendMessage(user.phone_number, response.message);
+            
+            if (response.completeOnboarding) {
+              await ConversationState.completeOnboarding(user.id);
+            }
+            return;
+          }
+          
+          // Regular income update response
           const aiResponse = await this.arnaldo.processMessage(
-            `User told me their monthly income is R$${income.amount.toFixed(2)}. Acknowledge this and ask what help they need with budgeting.`,
+            `User updated monthly income to R$${income.amount.toFixed(2)}. Give brief confirmation and ask how to help with their budget.`,
             context
           );
           await this.sendMessage(user.phone_number, aiResponse);
@@ -274,7 +321,7 @@ class WhatsAppService {
         }
       }
       
-      // Check if it's an expense message
+      // 6. Check if it's an expense message
       if (ExpenseParser.isExpenseMessage(messageText)) {
         const expense = ExpenseParser.parse(messageText);
         
@@ -295,12 +342,11 @@ class WhatsAppService {
           Today total: R$${updatedContext.expenses.todayTotal.toFixed(2)}
           Daily budget: R$${updatedContext.expenses.dailyBudget.toFixed(2)}
           
-          Give brief feedback on this expense.`;
+          Give brief, encouraging feedback.`;
           
           const aiResponse = await this.arnaldo.processMessage(prompt, updatedContext);
           await this.sendMessage(user.phone_number, aiResponse);
           
-          // Track analytics
           await this.trackEvent(user.id, 'expense_logged', {
             amount: expense.amount,
             category: expense.category
@@ -310,14 +356,14 @@ class WhatsAppService {
         }
       }
       
-      // For general messages, use AI processing
+      // 7. For general messages, use AI processing
       const aiResponse = await this.arnaldo.processMessage(messageText, context);
       await this.sendMessage(user.phone_number, aiResponse);
       
-      // Track message interaction
       await this.trackEvent(user.id, 'message_sent', {
         hasIncome: context.profile?.monthly_income ? true : false,
-        isOnboarded: context.profile?.onboarding_completed || false
+        isOnboarded: context.profile?.onboarding_completed || false,
+        state: userState
       });
       
     } catch (error) {
