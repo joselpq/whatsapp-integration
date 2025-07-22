@@ -31,7 +31,7 @@ const config = {
 const whatsappService = new WhatsAppService();
 
 // DEVELOPMENT ENDPOINTS (REMOVE IN PRODUCTION)
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === 'true') {
   const DevTools = require('./src/utils/dev-tools');
   
   // Reset user for testing
