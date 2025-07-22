@@ -30,6 +30,26 @@ const config = {
 // Initialize WhatsApp service
 const whatsappService = new WhatsAppService();
 
+// TEMPORARY: Add financial tables (REMOVE AFTER USE)
+app.get('/add-financial-tables-once', async (req, res) => {
+  try {
+    console.log('Adding financial tables...');
+    const addFinancialTables = require('./scripts/add-financial-tables');
+    await addFinancialTables();
+    res.json({ 
+      success: true, 
+      message: 'Financial tables added successfully!',
+      warning: 'REMOVE THIS ENDPOINT FROM CODE'
+    });
+  } catch (error) {
+    console.error('Failed to add financial tables:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 // Webhook verification endpoint (GET)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
