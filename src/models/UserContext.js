@@ -1,5 +1,6 @@
 const User = require('./User');
 const Message = require('./Message');
+const Goal = require('./Goal');
 const db = require('../database/db');
 
 class UserContext {
@@ -41,7 +42,8 @@ class UserContext {
       SELECT 
         u.id,
         u.phone_number,
-        u.display_name,
+        u.first_name,
+        u.last_name,
         u.monthly_income,
         u.payday,
         u.family_size,
@@ -75,63 +77,81 @@ class UserContext {
   }
 
   static async getExpenseContext(userId) {
-    // Get today's expenses
-    const todayQuery = `
-      SELECT 
-        category,
-        amount,
-        description
-      FROM expenses
-      WHERE user_id = $1 
-      AND expense_date = CURRENT_DATE
-      ORDER BY created_at DESC
-    `;
-    
-    const todayResult = await db.query(todayQuery, [userId]);
-    const todayExpenses = todayResult.rows;
-    const todayTotal = todayExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
-    
-    // Get month total
-    const monthQuery = `
-      SELECT 
-        COALESCE(SUM(amount), 0) as month_total
-      FROM expenses
-      WHERE user_id = $1 
-      AND DATE_TRUNC('month', expense_date) = DATE_TRUNC('month', CURRENT_DATE)
-    `;
-    
-    const monthResult = await db.query(monthQuery, [userId]);
-    const monthTotal = parseFloat(monthResult.rows[0].month_total);
-    
-    // Calculate daily budget
-    const profile = await this.getUserProfile(userId);
-    const dailyBudget = await this.calculateDailyBudget(userId, profile);
-    
-    return {
-      todayExpenses,
-      todayTotal,
-      monthTotal,
-      dailyBudget,
-      remainingToday: dailyBudget - todayTotal
-    };
+    try {
+      // Get today's expenses
+      const todayQuery = `
+        SELECT 
+          category,
+          amount,
+          description
+        FROM expenses
+        WHERE user_id = $1 
+        AND expense_date = CURRENT_DATE
+        ORDER BY created_at DESC
+      `;
+      
+      const todayResult = await db.query(todayQuery, [userId]);
+      const todayExpenses = todayResult.rows;
+      const todayTotal = todayExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+      
+      // Get month total
+      const monthQuery = `
+        SELECT 
+          COALESCE(SUM(amount), 0) as month_total
+        FROM expenses
+        WHERE user_id = $1 
+        AND DATE_TRUNC('month', expense_date) = DATE_TRUNC('month', CURRENT_DATE)
+      `;
+      
+      const monthResult = await db.query(monthQuery, [userId]);
+      const monthTotal = parseFloat(monthResult.rows[0].month_total);
+      
+      // Calculate daily budget
+      const profile = await this.getUserProfile(userId);
+      const dailyBudget = await this.calculateDailyBudget(userId, profile);
+      
+      return {
+        todayExpenses,
+        todayTotal,
+        monthTotal,
+        dailyBudget,
+        remainingToday: dailyBudget - todayTotal
+      };
+    } catch (error) {
+      console.log('Expense tracking not ready yet:', error.message);
+      // Return default values if tables don't exist
+      return {
+        todayExpenses: [],
+        todayTotal: 0,
+        monthTotal: 0,
+        dailyBudget: 50,
+        remainingToday: 50
+      };
+    }
   }
 
   static async getActiveGoals(userId) {
-    const query = `
-      SELECT 
-        type,
-        target_amount,
-        current_amount,
-        target_date
-      FROM goals
-      WHERE user_id = $1
-      AND (target_date IS NULL OR target_date > CURRENT_DATE)
-      ORDER BY created_at DESC
-      LIMIT 3
-    `;
-    
-    const result = await db.query(query, [userId]);
-    return result.rows;
+    try {
+      const query = `
+        SELECT 
+          type,
+          target_amount,
+          current_amount,
+          target_date
+        FROM goals
+        WHERE user_id = $1
+        AND status = 'active'
+        ORDER BY created_at DESC
+        LIMIT 3
+      `;
+      
+      const result = await db.query(query, [userId]);
+      return result.rows;
+    } catch (error) {
+      // Table might not exist yet, return empty array
+      console.log('Goals table not ready yet');
+      return [];
+    }
   }
 
   static async calculateDailyBudget(userId, profile) {
