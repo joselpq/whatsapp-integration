@@ -1,13 +1,12 @@
 -- Financial data schema additions for Arnaldo AI
 
 -- Add financial fields to users table
-ALTER TABLE users ADD COLUMN IF NOT EXISTS 
-  monthly_income DECIMAL(10,2),
-  payday INTEGER CHECK (payday >= 1 AND payday <= 31),
-  family_size INTEGER DEFAULT 1,
-  onboarding_completed BOOLEAN DEFAULT FALSE,
-  premium_subscriber BOOLEAN DEFAULT FALSE,
-  premium_started_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_income DECIMAL(10,2);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS payday INTEGER CHECK (payday >= 1 AND payday <= 31);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS family_size INTEGER DEFAULT 1;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_subscriber BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_started_at TIMESTAMP WITH TIME ZONE;
 
 -- Expenses tracking table
 CREATE TABLE IF NOT EXISTS expenses (
@@ -17,9 +16,10 @@ CREATE TABLE IF NOT EXISTS expenses (
   category VARCHAR(50),
   description TEXT,
   expense_date DATE DEFAULT CURRENT_DATE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_expenses_user_date (user_id, expense_date)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, expense_date);
 
 -- Financial goals table
 CREATE TABLE IF NOT EXISTS goals (
@@ -32,9 +32,10 @@ CREATE TABLE IF NOT EXISTS goals (
   target_date DATE,
   status VARCHAR(20) DEFAULT 'active', -- active, completed, abandoned
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE,
-  INDEX idx_goals_user_status (user_id, status)
+  completed_at TIMESTAMP WITH TIME ZONE
 );
+
+CREATE INDEX IF NOT EXISTS idx_goals_user_status ON goals(user_id, status);
 
 -- Daily summaries for quick access
 CREATE TABLE IF NOT EXISTS daily_summaries (
@@ -57,9 +58,10 @@ CREATE TABLE IF NOT EXISTS insights (
   metadata JSONB,
   delivered BOOLEAN DEFAULT FALSE,
   delivered_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_insights_user_delivered (user_id, delivered)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_insights_user_delivered ON insights(user_id, delivered);
 
 -- Analytics events for tracking user behavior
 CREATE TABLE IF NOT EXISTS analytics_events (
@@ -67,10 +69,11 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   event_name VARCHAR(100) NOT NULL,
   properties JSONB,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  INDEX idx_analytics_user_event (user_id, event_name),
-  INDEX idx_analytics_created (created_at)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_analytics_user_event ON analytics_events(user_id, event_name);
+CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
 
 -- Referrals for viral growth tracking
 CREATE TABLE IF NOT EXISTS referrals (
@@ -80,10 +83,11 @@ CREATE TABLE IF NOT EXISTS referrals (
   referred_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   status VARCHAR(20) DEFAULT 'pending', -- pending, completed, expired
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE,
-  INDEX idx_referrals_referrer (referrer_user_id),
-  INDEX idx_referrals_status (status)
+  completed_at TIMESTAMP WITH TIME ZONE
 );
+
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_user_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_created 
