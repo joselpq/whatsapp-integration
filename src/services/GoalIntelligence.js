@@ -14,11 +14,11 @@ class GoalIntelligence {
       const prompt = this.buildGoalAnalysisPrompt(message, context);
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "You are Arnaldo, a warm and intelligent Brazilian financial advisor. Analyze user messages about financial goals and respond with helpful, empathetic guidance."
+            content: "You are Arnaldo, a warm and intelligent Brazilian financial advisor. Analyze user messages about financial goals and respond with helpful, empathetic guidance. Always respond with valid JSON only."
           },
           {
             role: "user", 
@@ -26,8 +26,7 @@ class GoalIntelligence {
           }
         ],
         temperature: 0.7,
-        max_tokens: 500,
-        response_format: { type: "json_object" }
+        max_tokens: 500
       });
 
       const aiResponse = JSON.parse(response.choices[0].message.content);
@@ -100,11 +99,11 @@ class GoalIntelligence {
       const prompt = this.buildClarificationPrompt(message, goalContext);
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",
-            content: "You are Arnaldo continuing a goal conversation. Build on previous context and help complete the goal definition with warmth and intelligence."
+            content: "You are Arnaldo continuing a goal conversation. Build on previous context and help complete the goal definition with warmth and intelligence. Always respond with valid JSON only."
           },
           {
             role: "user",
@@ -112,8 +111,7 @@ class GoalIntelligence {
           }
         ],
         temperature: 0.7,
-        max_tokens: 500,
-        response_format: { type: "json_object" }
+        max_tokens: 500
       });
 
       const aiResponse = JSON.parse(response.choices[0].message.content);
@@ -189,7 +187,7 @@ class GoalIntelligence {
       `;
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.8,
         max_tokens: 300
