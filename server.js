@@ -120,6 +120,27 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
       });
     }
   });
+
+  // Run Pluggy tables migration
+  app.post('/dev/migrate-pluggy', async (req, res) => {
+    const migrate = require('./scripts/add-pluggy-tables');
+    
+    try {
+      console.log('🔄 Starting Pluggy migration from API endpoint...');
+      await migrate();
+      res.json({ 
+        success: true, 
+        message: 'Pluggy tables migration completed successfully',
+        warning: 'REMOVE THIS ENDPOINT BEFORE PRODUCTION'
+      });
+    } catch (error) {
+      console.error('Migration error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
 }
 
 // API Routes
