@@ -26,13 +26,21 @@ class GoalIntelligence {
         lastMessage: message
       };
       
+      // Get conversation guidelines from supervisor BEFORE generating
+      const guidelines = await this.supervisor.getConversationGuidelines(
+        'GOAL_DISCOVERY',
+        enrichedContext,
+        aiContext.conversationHistory
+      );
+      
+      const guidelinesPrompt = this.supervisor.buildGuidelinesPrompt(guidelines);
       const prompt = this.buildGoalAnalysisPrompt(message, enrichedContext);
       
       // Build message history for AI
       const messages = [
         {
           role: "system",
-          content: this.getSystemPrompt(enrichedContext)
+          content: this.getSystemPrompt(enrichedContext) + '\n\n' + guidelinesPrompt
         }
       ];
       
@@ -73,17 +81,10 @@ class GoalIntelligence {
         confidence: aiResponse.extracted_data?.confidence
       });
       
-      // Supervise the response
-      const supervisionResult = await this.supervisor.superviseConversation(
-        'GOAL_DISCOVERY',
-        [{ user: message }],
-        aiResponse.message,
-        context
-      );
-      
-      if (!supervisionResult.approved) {
-        console.log(`🎯 Supervisor intervention: ${supervisionResult.corrections.join(', ')}`);
-        aiResponse.message = supervisionResult.revisedResponse;
+      // Validate response follows guidelines (lightweight check)
+      const validation = await this.supervisor.validateResponse(aiResponse.message, guidelines);
+      if (!validation.followsGuidelines) {
+        console.log(`⚠️ Response violated guidelines: ${validation.violations.join(', ')}`);
       }
       
       return aiResponse;
@@ -196,13 +197,21 @@ Always respond with valid JSON as specified in the prompts.`;
         lastMessage: message
       };
       
+      // Get conversation guidelines from supervisor
+      const guidelines = await this.supervisor.getConversationGuidelines(
+        'GOAL_CLARIFICATION',
+        enrichedContext,
+        aiContext.conversationHistory
+      );
+      
+      const guidelinesPrompt = this.supervisor.buildGuidelinesPrompt(guidelines);
       const prompt = this.buildClarificationPrompt(message, enrichedContext);
       
       // Build message history
       const messages = [
         {
           role: "system",
-          content: this.getSystemPrompt(enrichedContext)
+          content: this.getSystemPrompt(enrichedContext) + '\n\n' + guidelinesPrompt
         }
       ];
       
@@ -241,17 +250,10 @@ Always respond with valid JSON as specified in the prompts.`;
         nextFocus: aiResponse.next_question_focus
       });
       
-      // Supervise the clarification response
-      const supervisionResult = await this.supervisor.superviseConversation(
-        'GOAL_CLARIFICATION',
-        [{ user: message }],
-        aiResponse.message,
-        goalContext
-      );
-      
-      if (!supervisionResult.approved) {
-        console.log(`🎯 Supervisor intervention in clarification: ${supervisionResult.corrections.join(', ')}`);
-        aiResponse.message = supervisionResult.revisedResponse;
+      // Validate response follows guidelines
+      const validation = await this.supervisor.validateResponse(aiResponse.message, guidelines);
+      if (!validation.followsGuidelines) {
+        console.log(`⚠️ Response violated guidelines: ${validation.violations.join(', ')}`);
       }
       
       return aiResponse;
