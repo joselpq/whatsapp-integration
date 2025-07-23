@@ -6,6 +6,8 @@ class ConversationState {
     NEW_USER: 'new_user',
     ONBOARDING_WELCOME: 'onboarding_welcome',
     GOAL_DISCOVERY: 'goal_discovery',
+    GOAL_CLARIFICATION: 'goal_clarification',
+    GOAL_COMPLETE: 'goal_complete',
     INCOME_COLLECTION: 'income_collection',
     EXPENSE_ANALYSIS: 'expense_analysis',
     PLAN_CREATION: 'plan_creation',

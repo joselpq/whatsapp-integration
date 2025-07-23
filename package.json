@@ -14,7 +14,9 @@
     "db:add-financial": "node scripts/add-financial-tables.js",
     "test": "node tests/integration/onboarding-test.js",
     "test:performance": "node tests/load/performance-test.js",
-    "test:all": "npm test && npm run test:performance"
+    "test:goal-wizard": "node tests/goal-wizard-test.js",
+    "test:state": "node tests/test-state-persistence.js",
+    "test:all": "npm test && npm run test:performance && npm run test:goal-wizard"
   },
   "keywords": [
     "whatsapp",

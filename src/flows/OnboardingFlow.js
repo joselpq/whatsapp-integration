@@ -1,5 +1,6 @@
 const ConversationState = require('../services/ConversationState');
 const Goal = require('../models/Goal');
+const GoalIntelligence = require('../services/GoalIntelligence');
 
 class OnboardingFlow {
   
@@ -13,6 +14,12 @@ class OnboardingFlow {
         
       case ConversationState.STATES.GOAL_DISCOVERY:
         return this.handleGoalDiscovery(userId, messageText);
+        
+      case ConversationState.STATES.GOAL_CLARIFICATION:
+        return this.handleGoalClarification(userId, messageText);
+        
+      case ConversationState.STATES.GOAL_COMPLETE:
+        return this.handleGoalComplete(userId, messageText);
         
       case ConversationState.STATES.INCOME_COLLECTION:
         return this.handleIncomeCollection(userId, messageText);
@@ -30,7 +37,7 @@ class OnboardingFlow {
     await ConversationState.updateUserState(
       userId, 
       ConversationState.STATES.GOAL_DISCOVERY,
-      { stage: 'welcome_shown' }
+      { stage: 'welcome_shown', attempt: 1 }
     );
     
     return {
@@ -38,93 +45,63 @@ class OnboardingFlow {
 
 Vou te ajudar a organizar suas finanças e realizar seus sonhos.
 
-Primeiro, me conta: qual é seu MAIOR objetivo financeiro agora?
+Me conta: qual é seu MAIOR objetivo financeiro agora?
 
-1️⃣ Criar reserva de emergência
-2️⃣ Comprar algo específico (casa, carro...)
-3️⃣ Quitar dívidas
-4️⃣ Aumentar minha renda
+Pode ser qualquer coisa:
+💰 Criar reserva de emergência
+🏠 Comprar casa, carro, celular...
+💳 Quitar dívidas
+💡 Economizar mais dinheiro
+🎓 Fazer curso, viagem...
+🤷 Não sei bem ainda
 
-Responde só o número da sua prioridade!`
+Me fala com suas palavras!`
     };
   }
   
   static async handleGoalDiscovery(userId, messageText) {
-    // Parse the goal selection
-    let goalType = '';
-    let goalMessage = '';
-    let followUpMessage = '';
-    
-    if (messageText.includes('1') || messageText.includes('reserva') || messageText.includes('emergência')) {
-      goalType = 'emergency_fund';
-      goalMessage = 'Reserva de emergência - excelente escolha! 🛡️';
-      followUpMessage = 'Vamos criar sua proteção financeira. Quantos meses de gastos você quer guardar? (Recomendo 3-6 meses)';
-      
-    } else if (messageText.includes('2') || messageText.includes('comprar') || messageText.includes('casa') || messageText.includes('carro')) {
-      goalType = 'big_purchase';
-      goalMessage = 'Sonho de compra - vamos tornar realidade! 🏠🚗';
-      followUpMessage = 'Me conta: o que você quer comprar e quanto custa aproximadamente?';
-      
-    } else if (messageText.includes('3') || messageText.includes('dívida') || messageText.includes('quitar')) {
-      goalType = 'debt_freedom';
-      goalMessage = 'Liberdade financeira - foco total! 💪';
-      followUpMessage = 'Quanto você deve no total? Vamos criar um plano para te livrar dessas dívidas!';
-      
-    } else if (messageText.includes('4') || messageText.includes('renda') || messageText.includes('aumentar')) {
-      goalType = 'increase_income';
-      goalMessage = 'Aumentar renda - estratégia inteligente! 📈';
-      followUpMessage = 'Quanto você ganha hoje e quanto quer chegar a ganhar?';
-      
-    } else {
-      // Default response for unclear input
-      return {
-        message: `Não entendi bem. Escolhe uma opção:
-
-1️⃣ Reserva de emergência
-2️⃣ Comprar algo específico
-3️⃣ Quitar dívidas  
-4️⃣ Aumentar renda
-
-Só responde o número!`,
-        nextState: ConversationState.STATES.GOAL_DISCOVERY
-      };
-    }
-    
-    // Create goal in database
     try {
-      const goal = await Goal.create({
-        userId,
-        type: goalType,
-        name: goalType.replace('_', ' '),
-        targetAmount: 1000, // Will be updated based on follow-up
-        targetDate: null
-      });
+      console.log(`🎯 Starting AI-first goal discovery for user ${userId}`);
       
-      // Update state to income collection
-      await ConversationState.updateUserState(
-        userId, 
-        ConversationState.STATES.INCOME_COLLECTION,
-        { 
-          goalType,
-          goalId: goal.id,
-          stage: 'goal_selected' 
-        }
-      );
+      // Get current context
+      const stateContext = await ConversationState.getStateContext(userId);
+      const context = {
+        attempt: (stateContext?.context?.attempt || 0) + 1,
+        stage: 'initial_discovery'
+      };
+      
+      // Use AI to analyze the goal message
+      const goalIntelligence = new GoalIntelligence();
+      const aiResponse = await goalIntelligence.analyzeGoalMessage(messageText, userId, context);
+      
+      // Process the AI response
+      if (aiResponse.needs_clarification) {
+        // Need more information - transition to clarification state
+        await ConversationState.updateUserState(
+          userId,
+          ConversationState.STATES.GOAL_CLARIFICATION,
+          {
+            partial_goal: aiResponse.extracted_data,
+            last_question_focus: aiResponse.next_question_focus,
+            user_emotion: aiResponse.user_emotion,
+            attempt: context.attempt
+          }
+        );
+        
+        return {
+          message: aiResponse.message
+        };
+      } else {
+        // Goal is complete - save and proceed
+        return await this.completeGoalDefinition(userId, aiResponse.extracted_data);
+      }
+      
     } catch (error) {
-      console.log('Goal creation skipped (testing mode):', error.message);
-      // Still update state even if goal creation fails
-      await ConversationState.updateUserState(
-        userId, 
-        ConversationState.STATES.INCOME_COLLECTION,
-        { goalType, stage: 'goal_selected' }
-      );
+      console.error('❌ Error in AI goal discovery:', error);
+      
+      // Fallback to simple goal discovery
+      return this.fallbackGoalDiscovery(userId, messageText);
     }
-    
-    return {
-      message: `${goalMessage}
-
-${followUpMessage}`
-    };
   }
   
   static async handleIncomeCollection(userId, messageText) {
@@ -194,6 +171,162 @@ Vamos começar! Me manda seus gastos que eu acompanho tudo.
 Primeira meta: economizar R$${Math.round(monthlySavings/4)} esta semana! 🚀`,
       completeOnboarding: true
     };
+  }
+  
+  static async handleGoalClarification(userId, messageText) {
+    try {
+      console.log(`🎯 Handling goal clarification for user ${userId}`);
+      
+      // Get current goal context
+      const stateContext = await ConversationState.getStateContext(userId);
+      const goalContext = {
+        partial_goal: stateContext?.context?.partial_goal,
+        last_question_focus: stateContext?.context?.last_question_focus,
+        missing_fields: stateContext?.context?.missing_fields,
+        attempt: (stateContext?.context?.attempt || 0) + 1
+      };
+      
+      // Use AI to handle the clarification
+      const goalIntelligence = new GoalIntelligence();
+      const aiResponse = await goalIntelligence.handleGoalClarification(messageText, userId, goalContext);
+      
+      if (aiResponse.needs_clarification) {
+        // Still need more info - update context and continue
+        await ConversationState.updateUserState(
+          userId,
+          ConversationState.STATES.GOAL_CLARIFICATION,
+          {
+            partial_goal: aiResponse.extracted_data,
+            last_question_focus: aiResponse.next_question_focus,
+            user_emotion: aiResponse.user_emotion,
+            attempt: goalContext.attempt
+          }
+        );
+        
+        return {
+          message: aiResponse.message
+        };
+      } else {
+        // Goal is now complete
+        return await this.completeGoalDefinition(userId, aiResponse.extracted_data);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in goal clarification:', error);
+      
+      // Fallback response
+      return {
+        message: "Perfeito! Vamos continuar definindo seu objetivo. Me conta mais detalhes para eu te ajudar melhor."
+      };
+    }
+  }
+  
+  static async completeGoalDefinition(userId, goalData) {
+    try {
+      console.log(`✅ Completing goal definition for user ${userId}:`, goalData);
+      
+      // Create the goal in database
+      const goal = await Goal.create({
+        userId,
+        type: goalData.goal_type || 'other',
+        name: goalData.item || goalData.goal_type || 'Meta financeira',
+        targetAmount: goalData.amount || 1000,
+        targetDate: goalData.timeline ? this.parseTargetDate(goalData.timeline) : null,
+        description: JSON.stringify(goalData)
+      });
+      
+      // Generate AI summary
+      const goalIntelligence = new GoalIntelligence();
+      const summary = await goalIntelligence.createGoalSummary(goalData, userId);
+      
+      // Update state to income collection
+      await ConversationState.updateUserState(
+        userId,
+        ConversationState.STATES.INCOME_COLLECTION,
+        {
+          goalId: goal.id,
+          goalType: goalData.goal_type,
+          goalComplete: true,
+          stage: 'goal_completed'
+        }
+      );
+      
+      return {
+        message: summary
+      };
+      
+    } catch (error) {
+      console.error('❌ Error completing goal definition:', error);
+      
+      // Fallback - still proceed to income collection
+      await ConversationState.updateUserState(
+        userId,
+        ConversationState.STATES.INCOME_COLLECTION,
+        { stage: 'goal_completed_fallback' }
+      );
+      
+      return {
+        message: "🎯 Objetivo definido! Vamos criar seu plano financeiro personalizado.\n\nPara começar, me conta quanto você ganha por mês?"
+      };
+    }
+  }
+  
+  static async handleGoalComplete(userId, messageText) {
+    // This state shouldn't normally be reached, but handle gracefully
+    return {
+      message: "Seu objetivo já está definido! Vamos para o próximo passo.\n\nMe conta quanto você ganha por mês para criar seu plano personalizado."
+    };
+  }
+  
+  static fallbackGoalDiscovery(userId, messageText) {
+    console.log('🔄 Using fallback goal discovery');
+    
+    const text = messageText.toLowerCase();
+    
+    // Simple pattern matching for common goals
+    if (text.includes('carro') || text.includes('casa') || text.includes('comprar')) {
+      return {
+        message: "Entendi que você quer fazer uma compra! Me conta mais detalhes: o que você quer comprar e qual faixa de preço?"
+      };
+    }
+    
+    if (text.includes('reserva') || text.includes('emergência') || text.includes('guardar')) {
+      return {
+        message: "Criar uma reserva de emergência é muito inteligente! Quantos meses de gastos você quer guardar? Recomendo entre 3 a 6 meses."
+      };
+    }
+    
+    if (text.includes('dívida') || text.includes('quitar') || text.includes('pagar')) {
+      return {
+        message: "Vamos te ajudar a quitar suas dívidas! Quanto você deve no total? Cartão, financiamentos, empréstimos..."
+      };
+    }
+    
+    // Generic fallback
+    return {
+      message: "Me conta mais sobre seu objetivo financeiro. O que você mais quer conquistar agora? Pode ser uma compra, guardar dinheiro, quitar dívidas..."
+    };
+  }
+  
+  static parseTargetDate(timeline) {
+    // Simple timeline parsing
+    const text = timeline.toLowerCase();
+    const now = new Date();
+    
+    if (text.includes('ano') || text.includes('year')) {
+      const match = text.match(/(\d+)/);
+      const years = match ? parseInt(match[1]) : 1;
+      return new Date(now.getFullYear() + years, now.getMonth(), now.getDate());
+    }
+    
+    if (text.includes('meses') || text.includes('month')) {
+      const match = text.match(/(\d+)/);
+      const months = match ? parseInt(match[1]) : 6;
+      return new Date(now.getFullYear(), now.getMonth() + months, now.getDate());
+    }
+    
+    // Default to 1 year if unclear
+    return new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
   }
   
   static getEmergencyResponse() {
