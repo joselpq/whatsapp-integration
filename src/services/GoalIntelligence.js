@@ -1,10 +1,12 @@
 const OpenAI = require('openai');
+const ConversationSupervisor = require('./ConversationSupervisor');
 
 class GoalIntelligence {
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     });
+    this.supervisor = new ConversationSupervisor();
   }
 
   async analyzeGoalMessage(message, userId, context = {}) {
@@ -37,6 +39,19 @@ class GoalIntelligence {
         confidence: aiResponse.extracted_data?.confidence
       });
       
+      // Supervise the response
+      const supervisionResult = await this.supervisor.superviseConversation(
+        'GOAL_DISCOVERY',
+        [{ user: message }],
+        aiResponse.message,
+        context
+      );
+      
+      if (!supervisionResult.approved) {
+        console.log(`🎯 Supervisor intervention: ${supervisionResult.corrections.join(', ')}`);
+        aiResponse.message = supervisionResult.revisedResponse;
+      }
+      
       return aiResponse;
 
     } catch (error) {
@@ -54,6 +69,12 @@ class GoalIntelligence {
     User message: "${message}"
     Context: ${JSON.stringify(context)}
     
+    CRITICAL RULES:
+    - You are ONLY collecting information about their GOAL right now
+    - DO NOT ask about income, expenses, or budget yet
+    - DO NOT start financial planning until the goal is fully defined
+    - Focus ONLY on understanding what they want to achieve
+    
     Your task:
     1. Understand their financial goal completely
     2. Extract structured data if the goal is clear
@@ -67,13 +88,18 @@ class GoalIntelligence {
     - timeline: when they want to achieve it
     - confidence: how certain you are (0-1)
     
-    If you need clarification, ask ONE specific question in Brazilian Portuguese.
+    If you need clarification, ask ONE specific question about THE GOAL ONLY.
     Be natural and helpful, not robotic.
     
-    Examples of great responses:
+    GOOD examples (focused on goal):
     - "Que tipo de carro você está pensando? Algo mais básico para o dia a dia ou com mais recursos?"
     - "Legal! Quanto você gostaria de ter guardado para emergências? Uns 3, 6 meses de gastos?"
     - "Entendi que você quer economizar mais. É para algum objetivo específico ou para ter mais segurança?"
+    
+    BAD examples (jumping ahead):
+    - "Quanto você gasta por mês?" (NO - this is expense tracking)
+    - "Qual sua renda mensal?" (NO - this comes after goal definition)
+    - "Quais são seus gastos fixos?" (NO - too early for budget analysis)
     
     IMPORTANT: Respond only in valid JSON format:
     {
@@ -86,7 +112,7 @@ class GoalIntelligence {
         "confidence": 0.8
       } or null,
       "needs_clarification": true/false,
-      "next_question_focus": "budget" | "timeline" | "specifics" | "type" | null,
+      "next_question_focus": "amount" | "timeline" | "specifics" | "type" | null,
       "user_emotion": "excited" | "stressed" | "confused" | "neutral"
     }
     `;
@@ -121,6 +147,19 @@ class GoalIntelligence {
         nextFocus: aiResponse.next_question_focus
       });
       
+      // Supervise the clarification response
+      const supervisionResult = await this.supervisor.superviseConversation(
+        'GOAL_CLARIFICATION',
+        [{ user: message }],
+        aiResponse.message,
+        goalContext
+      );
+      
+      if (!supervisionResult.approved) {
+        console.log(`🎯 Supervisor intervention in clarification: ${supervisionResult.corrections.join(', ')}`);
+        aiResponse.message = supervisionResult.revisedResponse;
+      }
+      
       return aiResponse;
 
     } catch (error) {
@@ -138,26 +177,39 @@ class GoalIntelligence {
     
     The user is responding to your previous clarification question.
     
-    Your goal: Continue building their complete goal definition with empathy.
+    CRITICAL RULES:
+    - You are STILL in goal definition phase
+    - DO NOT ask about income, expenses, or create budgets yet
+    - Focus ONLY on completing the goal definition
+    - You need: goal type, specific item/objective, amount, and timeline
     
     Current goal state: ${goalContext.partial_goal || 'undefined'}
     What you were asking about: ${goalContext.last_question_focus || 'general goal'}
-    Missing information: ${goalContext.missing_fields || ['unknown']}
+    
+    What's still missing:
+    ${!goalContext.partial_goal?.goal_type ? '- Type of goal (purchase, emergency, debt, etc)' : ''}
+    ${!goalContext.partial_goal?.item ? '- Specific item or objective' : ''}
+    ${!goalContext.partial_goal?.amount ? '- Target amount in reais' : ''}
+    ${!goalContext.partial_goal?.timeline ? '- When they want to achieve it' : ''}
     
     Instructions:
     1. If they gave you what you asked for, acknowledge it warmly and extract the data
-    2. If the goal is now complete, create encouraging summary and prepare for next step
-    3. If you still need info, ask for the next missing piece naturally
-    4. If they seem confused, rephrase more clearly with examples
-    5. Stay encouraging and personal
+    2. Ask for the NEXT missing piece of THE GOAL (not income/expenses)
+    3. If all goal info is complete, create summary and say you'll ask about income NEXT
+    4. Stay encouraging and personal
     
-    Examples of good responses:
+    GOOD examples (focused on goal):
     - "Perfeito! Um carro usado é uma escolha inteligente 👍 Qual faixa de preço você está considerando? Até 20 mil, 30 mil, mais que isso?"
     - "Ótimo! 6 meses de reserva é uma meta excelente. Quando você gostaria de ter isso pronto? Este ano, no próximo ano?"
-    - "Entendi! Para ter mais segurança financeira faz todo sentido. Vamos definir uma meta: quanto você gostaria de economizar por mês?"
+    - "R$1.000 por mês, entendi! E por quanto tempo você quer manter essa economia extra? 6 meses, 1 ano, sempre?"
+    
+    BAD examples (jumping ahead):
+    - "Quais são seus gastos fixos?" (NO - too early)
+    - "Vamos ver seu orçamento" (NO - goal not complete)
+    - "Quanto sobra por mês?" (NO - need income first)
     
     If the goal is complete, create an exciting summary like:
-    "🎯 OBJETIVO DEFINIDO!\\n\\nComprar um carro usado (até R$30.000) em 1 ano\\nVou te ajudar a realizar esse sonho! 🚗\\n\\nPara criar seu plano personalizado, me conta quanto você ganha por mês?"
+    "🎯 OBJETIVO DEFINIDO!\\n\\nEconomizar R$1.000 por mês extra para aposentadoria\\nExcelente visão de futuro! 💪\\n\\nPara criar seu plano personalizado, me conta quanto você ganha por mês?"
     
     Respond in the same JSON format as before.
     `;
