@@ -20,7 +20,7 @@ router.post('/connect-token', async (req, res) => {
     }
     
     // Get or create user
-    const user = await User.findOrCreateByPhone(phoneNumber);
+    const user = await User.findOrCreate(phoneNumber);
     
     // Create connect token
     const tokenData = await pluggyService.createConnectToken(user.id, {
