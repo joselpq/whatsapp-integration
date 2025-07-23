@@ -20,6 +20,9 @@ app.use(express.json({
   }
 }));
 
+// Serve static files for testing
+app.use(express.static('public'));
+
 // Configuration
 const config = {
   webhookVerifyToken: process.env.WEBHOOK_VERIFY_TOKEN || 'zenmind-webhook-2025',
@@ -29,6 +32,9 @@ const config = {
 
 // Initialize WhatsApp service
 const whatsappService = new WhatsAppService();
+
+// Import API routes
+const pluggyRoutes = require('./src/api/pluggy');
 
 // DEVELOPMENT ENDPOINTS (REMOVE IN PRODUCTION)
 if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === 'true') {
@@ -115,6 +121,9 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     }
   });
 }
+
+// API Routes
+app.use('/api/pluggy', pluggyRoutes);
 
 // Webhook verification endpoint (GET)
 app.get('/webhook', (req, res) => {

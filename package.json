@@ -17,7 +17,8 @@
     "test:goal-wizard": "node tests/goal-wizard-test.js",
     "test:supervisor": "node tests/supervisor-test.js",
     "test:state": "node tests/test-state-persistence.js",
-    "test:all": "npm test && npm run test:performance && npm run test:goal-wizard && npm run test:supervisor"
+    "test:all": "npm test && npm run test:performance && npm run test:goal-wizard && npm run test:supervisor",
+    "pluggy:setup": "node scripts/add-pluggy-tables.js"
   },
   "keywords": [
     "whatsapp",
