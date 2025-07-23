@@ -108,7 +108,7 @@ class ConversationSupervisor {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
         max_tokens: 200
@@ -162,7 +162,7 @@ class ConversationSupervisor {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
         max_tokens: 200
@@ -217,7 +217,7 @@ class ConversationSupervisor {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
         max_tokens: 200
@@ -256,7 +256,7 @@ class ConversationSupervisor {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 300

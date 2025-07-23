@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 const ConversationSupervisor = require('./ConversationSupervisor');
+const ConversationMemory = require('./ConversationMemory');
 
 class GoalIntelligence {
   constructor() {
@@ -7,31 +8,64 @@ class GoalIntelligence {
       apiKey: process.env.OPENAI_API_KEY
     });
     this.supervisor = new ConversationSupervisor();
+    this.memory = new ConversationMemory();
   }
 
   async analyzeGoalMessage(message, userId, context = {}) {
     try {
       console.log(`🧠 Analyzing goal message for user ${userId}: "${message}"`);
       
-      const prompt = this.buildGoalAnalysisPrompt(message, context);
+      // Load full conversation context
+      const fullContext = await this.memory.loadConversationContext(userId);
+      const aiContext = this.memory.formatForAI(fullContext);
+      
+      // Merge with provided context
+      const enrichedContext = {
+        ...context,
+        ...aiContext,
+        lastMessage: message
+      };
+      
+      const prompt = this.buildGoalAnalysisPrompt(message, enrichedContext);
+      
+      // Build message history for AI
+      const messages = [
+        {
+          role: "system",
+          content: this.getSystemPrompt(enrichedContext)
+        }
+      ];
+      
+      // Add recent conversation history for better context
+      if (aiContext.conversationHistory && aiContext.conversationHistory.length > 0) {
+        const recentHistory = aiContext.conversationHistory.slice(-10); // Last 10 messages
+        recentHistory.forEach(msg => {
+          messages.push({
+            role: msg.role,
+            content: msg.content
+          });
+        });
+      }
+      
+      // Add the current analysis request
+      messages.push({
+        role: "user",
+        content: prompt
+      });
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are Arnaldo, a warm and intelligent Brazilian financial advisor. Analyze user messages about financial goals and respond with helpful, empathetic guidance. Always respond with valid JSON only."
-          },
-          {
-            role: "user", 
-            content: prompt
-          }
-        ],
+        model: "gpt-4o",
+        messages: messages,
         temperature: 0.7,
         max_tokens: 500
       });
 
-      const aiResponse = JSON.parse(response.choices[0].message.content);
+      // GPT-4o sometimes wraps JSON in markdown code blocks
+      let content = response.choices[0].message.content;
+      if (content.startsWith('```json')) {
+        content = content.replace(/```json\n?/, '').replace(/\n?```$/, '');
+      }
+      const aiResponse = JSON.parse(content);
       
       console.log(`✅ Goal analysis complete:`, {
         needsClarification: aiResponse.needs_clarification,
@@ -60,6 +94,35 @@ class GoalIntelligence {
       // Fallback to simple parsing
       return this.fallbackGoalAnalysis(message);
     }
+  }
+
+  getSystemPrompt(context) {
+    return `You are Arnaldo, a warm and intelligent Brazilian financial advisor helping lower-income families achieve financial stability.
+
+USER PROFILE:
+${context.userSummary || 'New user'}
+
+CURRENT GOALS:
+${context.goals || 'No goals set yet'}
+
+RECENT ACTIVITY:
+${context.recentActivity || 'No recent activity'}
+
+CONVERSATION PHASE: ${context.currentPhase?.currentState || 'new_user'}
+
+Your personality:
+- Warm, empathetic, and encouraging
+- Use simple language, avoid financial jargon
+- Be culturally aware (Brazilian context)
+- Focus on practical, achievable steps
+- Remember previous conversations and build relationships
+
+Current capabilities:
+- You can see the user's profile, goals, and recent expenses
+- You have access to conversation history for context
+- You understand the current conversation phase and should act accordingly
+
+Always respond with valid JSON as specified in the prompts.`;
   }
 
   buildGoalAnalysisPrompt(message, context) {
@@ -122,25 +185,56 @@ class GoalIntelligence {
     try {
       console.log(`🎯 Handling goal clarification for user ${userId}`);
       
-      const prompt = this.buildClarificationPrompt(message, goalContext);
+      // Load full conversation context
+      const fullContext = await this.memory.loadConversationContext(userId);
+      const aiContext = this.memory.formatForAI(fullContext);
+      
+      // Merge contexts
+      const enrichedContext = {
+        ...goalContext,
+        ...aiContext,
+        lastMessage: message
+      };
+      
+      const prompt = this.buildClarificationPrompt(message, enrichedContext);
+      
+      // Build message history
+      const messages = [
+        {
+          role: "system",
+          content: this.getSystemPrompt(enrichedContext)
+        }
+      ];
+      
+      // Add recent conversation history
+      if (aiContext.conversationHistory && aiContext.conversationHistory.length > 0) {
+        const recentHistory = aiContext.conversationHistory.slice(-10);
+        recentHistory.forEach(msg => {
+          messages.push({
+            role: msg.role,
+            content: msg.content
+          });
+        });
+      }
+      
+      messages.push({
+        role: "user",
+        content: prompt
+      });
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are Arnaldo continuing a goal conversation. Build on previous context and help complete the goal definition with warmth and intelligence. Always respond with valid JSON only."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
+        model: "gpt-4o",
+        messages: messages,
         temperature: 0.7,
         max_tokens: 500
       });
 
-      const aiResponse = JSON.parse(response.choices[0].message.content);
+      // GPT-4o sometimes wraps JSON in markdown code blocks
+      let content = response.choices[0].message.content;
+      if (content.startsWith('```json')) {
+        content = content.replace(/```json\n?/, '').replace(/\n?```$/, '');
+      }
+      const aiResponse = JSON.parse(content);
       
       console.log(`✅ Clarification complete:`, {
         progressMade: !aiResponse.needs_clarification,
@@ -239,7 +333,7 @@ class GoalIntelligence {
       `;
       
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.8,
         max_tokens: 300
