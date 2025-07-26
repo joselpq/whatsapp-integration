@@ -64,30 +64,44 @@ Me fala com suas palavras!`
         stage: 'initial_discovery'
       };
       
-      // Use AI to analyze the goal message
-      const goalIntelligence = new GoalIntelligence();
-      const aiResponse = await goalIntelligence.analyzeGoalMessage(messageText, userId, context);
+      // Use simplified Arnaldo with full conversation context
+      const ArnaldoAI = require('../services/ArnaldoAI');
+      const arnaldo = new ArnaldoAI();
+      const aiResponse = await arnaldo.processGoalDiscoveryMessage(messageText, userId);
       
-      // Process the AI response
-      if (aiResponse.needs_clarification) {
-        // Need more information - transition to clarification state
+      // Check if goal is complete in the response
+      if (aiResponse.includes("então seu objetivo é:")) {
+        // Goal is complete - extract it and save
         await ConversationState.updateUserState(
           userId,
-          ConversationState.STATES.GOAL_CLARIFICATION,
+          ConversationState.STATES.GOAL_COMPLETE,
           {
-            partial_goal: aiResponse.extracted_data,
-            last_question_focus: aiResponse.next_question_focus,
-            user_emotion: aiResponse.user_emotion,
-            attempt: context.attempt
+            goalStatement: aiResponse,
+            stage: 'goal_completed'
+          }
+        );
+        
+        // Mark onboarding as complete
+        await ConversationState.completeOnboarding(userId);
+        
+        return {
+          message: aiResponse,
+          completeOnboarding: true
+        };
+      } else {
+        // Still discovering goal
+        await ConversationState.updateUserState(
+          userId,
+          ConversationState.STATES.GOAL_DISCOVERY,
+          {
+            attempt: context.attempt,
+            stage: 'discovery_ongoing'
           }
         );
         
         return {
-          message: aiResponse.message
+          message: aiResponse
         };
-      } else {
-        // Goal is complete - save and proceed
-        return await this.completeGoalDefinition(userId, aiResponse.extracted_data);
       }
       
     } catch (error) {
@@ -171,38 +185,35 @@ Primeira meta: economizar R$${Math.round(monthlySavings/4)} esta semana! 🚀`,
     try {
       console.log(`🎯 Handling goal clarification for user ${userId}`);
       
-      // Get current goal context
-      const stateContext = await ConversationState.getStateContext(userId);
-      const goalContext = {
-        partial_goal: stateContext?.context?.partial_goal,
-        last_question_focus: stateContext?.context?.last_question_focus,
-        missing_fields: stateContext?.context?.missing_fields,
-        attempt: (stateContext?.context?.attempt || 0) + 1
-      };
+      // Use simplified Arnaldo with full conversation context
+      const ArnaldoAI = require('../services/ArnaldoAI');
+      const arnaldo = new ArnaldoAI();
+      const aiResponse = await arnaldo.processGoalDiscoveryMessage(messageText, userId);
       
-      // Use AI to handle the clarification
-      const goalIntelligence = new GoalIntelligence();
-      const aiResponse = await goalIntelligence.handleGoalClarification(messageText, userId, goalContext);
-      
-      if (aiResponse.needs_clarification) {
-        // Still need more info - update context and continue
+      // Check if goal is complete in the response
+      if (aiResponse.includes("então seu objetivo é:")) {
+        // Goal is complete
         await ConversationState.updateUserState(
           userId,
-          ConversationState.STATES.GOAL_CLARIFICATION,
+          ConversationState.STATES.GOAL_COMPLETE,
           {
-            partial_goal: aiResponse.extracted_data,
-            last_question_focus: aiResponse.next_question_focus,
-            user_emotion: aiResponse.user_emotion,
-            attempt: goalContext.attempt
+            goalStatement: aiResponse,
+            stage: 'goal_completed'
           }
         );
         
+        // Mark onboarding as complete
+        await ConversationState.completeOnboarding(userId);
+        
         return {
-          message: aiResponse.message
+          message: aiResponse,
+          completeOnboarding: true
         };
       } else {
-        // Goal is now complete
-        return await this.completeGoalDefinition(userId, aiResponse.extracted_data);
+        // Still clarifying
+        return {
+          message: aiResponse
+        };
       }
       
     } catch (error) {

@@ -60,7 +60,7 @@ class ConversationMemory {
       const query = `
         SELECT 
           m.id,
-          m.sender,
+          m.direction,
           m.content,
           m.created_at,
           m.message_type
@@ -74,12 +74,23 @@ class ConversationMemory {
       const result = await db.query(query, [userId, this.maxMessages]);
       
       // Reverse to get chronological order
-      return result.rows.reverse().map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.content,
-        timestamp: msg.created_at,
-        type: msg.message_type
-      }));
+      return result.rows.reverse().map(msg => {
+        // Parse content if it's a JSON string
+        let messageContent = msg.content;
+        try {
+          const parsed = JSON.parse(msg.content);
+          messageContent = parsed.text || parsed.body || msg.content;
+        } catch (e) {
+          // If not JSON, use as is
+        }
+        
+        return {
+          role: msg.direction === 'inbound' ? 'user' : 'assistant',
+          content: messageContent,
+          timestamp: msg.created_at,
+          type: msg.message_type
+        };
+      });
       
     } catch (error) {
       console.error('Error loading conversation history:', error);
