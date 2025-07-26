@@ -251,28 +251,34 @@ class WhatsAppService {
     try {
       const messageText = message.text?.body || '';
       
-      // Simplified Arnaldo: Focus ONLY on goal discovery
-      const userState = await ConversationState.getUserState(user.id);
+      // ULTRA-SIMPLE LOGIC: Check if this is the first message
+      const messageCount = await this.getMessageCount(user.id);
       
-      // Handle goal discovery flow
-      if (await ConversationState.needsGuidance(user.id)) {
-        const goalResponse = await OnboardingFlow.handleOnboarding(
-          user.id, 
-          userState, 
-          messageText
-        );
+      if (messageCount === 0) {
+        // First message - send welcome
+        const welcomeMessage = `Oi! Sou o Arnaldo, seu consultor financeiro pessoal! 👋
+
+Vou te ajudar a organizar suas finanças e realizar seus sonhos.
+
+Me conta: qual é seu MAIOR objetivo financeiro agora?
+
+Pode ser qualquer coisa:
+💰 Criar reserva de emergência
+🏠 Comprar casa, carro, celular...
+💳 Quitar dívidas
+💡 Economizar mais dinheiro
+🎓 Fazer curso, viagem...
+🤷 Não sei bem ainda
+
+Me fala com suas palavras!`;
         
-        await this.sendMessage(user.phone_number, goalResponse.message);
+        await this.sendMessage(user.phone_number, welcomeMessage);
         return;
       }
       
-      // If user has completed goal, redirect back to goal discovery
+      // Any other message - send to ChatGPT with full conversation history
       const aiResponse = await this.arnaldo.processGoalDiscoveryMessage(messageText, user.id);
       await this.sendMessage(user.phone_number, aiResponse);
-      
-      await this.trackEvent(user.id, 'goal_discovery_message', {
-        state: userState
-      });
       
     } catch (error) {
       console.error('Error in processAndRespond:', error);
@@ -280,6 +286,22 @@ class WhatsAppService {
       // Fallback message
       const fallbackMessage = 'Oi! Tive um probleminha técnico aqui 😅 Pode repetir sua mensagem? Prometo que vou te ajudar!';
       await this.sendMessage(user.phone_number, fallbackMessage);
+    }
+  }
+  
+  async getMessageCount(userId) {
+    try {
+      const query = `
+        SELECT COUNT(*) as count
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = $1 AND m.direction = 'outbound'
+      `;
+      const result = await require('../database/db').query(query, [userId]);
+      return parseInt(result.rows[0].count);
+    } catch (error) {
+      console.error('Error getting message count:', error);
+      return 0;
     }
   }
   

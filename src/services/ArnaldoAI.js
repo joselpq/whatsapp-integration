@@ -108,40 +108,22 @@ STAY FOCUSED: Only talk about GOALS. Redirect off-topic conversations back to go
     return messages;
   }
 
-  // Goal discovery focused method with full conversation context
+  // ULTRA-SIMPLE: Just send message to ChatGPT with conversation history
   async processGoalDiscoveryMessage(message, userId) {
     try {
-      console.log(`🎯 Processing goal discovery message for user ${userId}: "${message}"`);
+      console.log(`🎯 Processing message for user ${userId}: "${message}"`);
       
-      // Load full conversation context
-      const fullContext = await this.memory.loadConversationContext(userId);
-      const aiContext = this.memory.formatForAI(fullContext);
+      // Get conversation history directly from database
+      const conversationHistory = await this.getSimpleConversationHistory(userId);
       
-      // Build messages for AI with full conversation history
+      // Build messages for ChatGPT
       const messages = [
-        { role: 'system', content: this.systemPrompt }
+        { role: 'system', content: this.systemPrompt },
+        ...conversationHistory,
+        { role: 'user', content: message }
       ];
-      
-      // Add conversation history for context (last 30 messages)
-      if (aiContext.conversationHistory && aiContext.conversationHistory.length > 0) {
-        const recentHistory = aiContext.conversationHistory.slice(-30);
-        console.log(`📚 Loading ${recentHistory.length} messages of conversation history for user ${userId}`);
-        
-        recentHistory.forEach(msg => {
-          messages.push({
-            role: msg.role,
-            content: msg.content
-          });
-        });
-      } else {
-        console.log(`⚠️ No conversation history found for user ${userId}`);
-      }
-      
-      // Add current message
-      messages.push({
-        role: 'user',
-        content: message
-      });
+
+      console.log(`📚 Sending ${messages.length - 2} messages of history to ChatGPT`);
 
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4o',
@@ -151,15 +133,54 @@ STAY FOCUSED: Only talk about GOALS. Redirect off-topic conversations back to go
       });
 
       const response = completion.choices[0].message.content;
-      console.log(`✅ Goal discovery response generated for user ${userId}`);
+      console.log(`✅ ChatGPT response received for user ${userId}`);
       
       return response;
       
     } catch (error) {
-      console.error('❌ Goal discovery AI error:', error);
+      console.error('❌ ChatGPT error:', error);
       
       // Fallback response
       return 'Me conta mais sobre seu objetivo financeiro! Quero te ajudar a definir sua meta 😊';
+    }
+  }
+  
+  async getSimpleConversationHistory(userId) {
+    try {
+      const db = require('../database/db');
+      const query = `
+        SELECT 
+          m.direction,
+          m.content,
+          m.created_at
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = $1
+        ORDER BY m.created_at ASC
+        LIMIT 30
+      `;
+      
+      const result = await db.query(query, [userId]);
+      
+      return result.rows.map(msg => {
+        // Parse content if it's JSON
+        let messageContent = msg.content;
+        try {
+          const parsed = JSON.parse(msg.content);
+          messageContent = parsed.text || parsed.body || msg.content;
+        } catch (e) {
+          // If not JSON, use as is
+        }
+        
+        return {
+          role: msg.direction === 'inbound' ? 'user' : 'assistant',
+          content: messageContent
+        };
+      });
+      
+    } catch (error) {
+      console.error('Error loading conversation history:', error);
+      return [];
     }
   }
 }
