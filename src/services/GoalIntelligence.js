@@ -1,5 +1,4 @@
 const OpenAI = require('openai');
-const ConversationSupervisor = require('./ConversationSupervisor');
 const ConversationMemory = require('./ConversationMemory');
 
 class GoalIntelligence {
@@ -7,7 +6,6 @@ class GoalIntelligence {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     });
-    this.supervisor = new ConversationSupervisor();
     this.memory = new ConversationMemory();
   }
 
@@ -26,21 +24,13 @@ class GoalIntelligence {
         lastMessage: message
       };
       
-      // Get conversation guidelines from supervisor BEFORE generating
-      const guidelines = await this.supervisor.getConversationGuidelines(
-        'GOAL_DISCOVERY',
-        enrichedContext,
-        aiContext.conversationHistory
-      );
-      
-      const guidelinesPrompt = this.supervisor.buildGuidelinesPrompt(guidelines);
       const prompt = this.buildGoalAnalysisPrompt(message, enrichedContext);
       
       // Build message history for AI
       const messages = [
         {
           role: "system",
-          content: this.getSystemPrompt(enrichedContext) + '\n\n' + guidelinesPrompt
+          content: this.getSystemPrompt(enrichedContext)
         }
       ];
       
@@ -80,12 +70,6 @@ class GoalIntelligence {
         extractedType: aiResponse.extracted_data?.goal_type,
         confidence: aiResponse.extracted_data?.confidence
       });
-      
-      // Validate response follows guidelines (lightweight check)
-      const validation = await this.supervisor.validateResponse(aiResponse.message, guidelines);
-      if (!validation.followsGuidelines) {
-        console.log(`⚠️ Response violated guidelines: ${validation.violations.join(', ')}`);
-      }
       
       return aiResponse;
 

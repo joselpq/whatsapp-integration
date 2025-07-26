@@ -1,37 +1,35 @@
 const OpenAI = require('openai');
+const ConversationMemory = require('./ConversationMemory');
 
 class ArnaldoAI {
   constructor() {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
+    this.memory = new ConversationMemory();
     
-    this.systemPrompt = `You are Arnaldo, a friendly Brazilian financial advisor on WhatsApp.
+    this.systemPrompt = `You are Arnaldo, a friendly Brazilian financial advisor whose SOLE MISSION is to help users discover and define their financial goal.
+
+CORE OBJECTIVE: Discover what the user wants to achieve financially - what, how much, by when.
 
 Personality:
 - Warm, supportive, never judgmental
 - Use natural Brazilian Portuguese
 - KEEP RESPONSES SHORT (max 2 sentences for simple questions, max 4 sentences for complex advice)
 - Use 1-2 emojis per message maximum
-- Celebrate small wins
+- Ask ONE question at a time
 
-Capabilities:
-- Track expenses ("gastei X no mercado")
-- Budget planning and daily limits
-- Emergency financial help
-- Savings tips
+YOUR ONLY JOB:
+1. Understand their financial goal completely (what, how much, when)
+2. Guide them to be specific if their goal is vague
+3. Once goal is clear and specific, say "então seu objetivo é:" and restate it
+4. Do NOT discuss income, expenses, budgets, or planning until goal is 100% clear
 
 Context:
 - Users are low-income Brazilians (classes C, D, E)
-- Many live paycheck to paycheck  
-- R$50 is significant money
-- Focus on practical, immediate solutions
+- Help them discover realistic goals for their situation
 
-Response style:
-- Be direct and helpful
-- Don't repeat information unnecessarily
-- Ask ONE clear question at a time
-- Give specific, actionable advice`;
+STAY FOCUSED: Only talk about GOALS. Redirect off-topic conversations back to goal discovery.`;
   }
 
   async processMessage(message, context) {
@@ -99,43 +97,55 @@ Response style:
     return messages;
   }
 
-  // Specific response generators for common scenarios
-  async generateEmergencyPlan(daysUntilPayday, availableMoney) {
-    const prompt = `User has R$${availableMoney} and needs to survive ${daysUntilPayday} days until payday. 
-    Create a practical daily budget and survival plan. Be specific and encouraging.`;
+  // Goal discovery focused method with full conversation context
+  async processGoalDiscoveryMessage(message, userId) {
+    try {
+      console.log(`🎯 Processing goal discovery message for user ${userId}: "${message}"`);
+      
+      // Load full conversation context
+      const fullContext = await this.memory.loadConversationContext(userId);
+      const aiContext = this.memory.formatForAI(fullContext);
+      
+      // Build messages for AI with full conversation history
+      const messages = [
+        { role: 'system', content: this.systemPrompt }
+      ];
+      
+      // Add conversation history for context (last 30 messages)
+      if (aiContext.conversationHistory && aiContext.conversationHistory.length > 0) {
+        const recentHistory = aiContext.conversationHistory.slice(-30);
+        recentHistory.forEach(msg => {
+          messages.push({
+            role: msg.role,
+            content: msg.content
+          });
+        });
+      }
+      
+      // Add current message
+      messages.push({
+        role: 'user',
+        content: message
+      });
 
-    const completion = await this.openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        { role: 'system', content: this.systemPrompt },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 600,
-    });
+      const completion = await this.openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 500,
+      });
 
-    return completion.choices[0].message.content;
-  }
-
-  async generateDailySummary(expenses, budget) {
-    const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const remaining = budget - totalSpent;
-    
-    const prompt = `User spent R$${totalSpent.toFixed(2)} today (budget was R$${budget.toFixed(2)}).
-    Expenses: ${expenses.map(e => `${e.category}: R$${e.amount}`).join(', ')}
-    Generate an encouraging daily summary with specific feedback.`;
-
-    const completion = await this.openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        { role: 'system', content: this.systemPrompt },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 300,
-    });
-
-    return completion.choices[0].message.content;
+      const response = completion.choices[0].message.content;
+      console.log(`✅ Goal discovery response generated for user ${userId}`);
+      
+      return response;
+      
+    } catch (error) {
+      console.error('❌ Goal discovery AI error:', error);
+      
+      // Fallback response
+      return 'Me conta mais sobre seu objetivo financeiro! Quero te ajudar a definir sua meta 😊';
+    }
   }
 }
 

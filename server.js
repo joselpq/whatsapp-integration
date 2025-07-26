@@ -141,6 +141,17 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
       });
     }
   });
+
+  // Check Pluggy configuration
+  app.get('/dev/pluggy-config', (req, res) => {
+    res.json({
+      clientIdConfigured: !!process.env.PLUGGY_CLIENT_ID,
+      clientSecretConfigured: !!process.env.PLUGGY_CLIENT_SECRET,
+      baseUrlConfigured: !!process.env.BASE_URL,
+      baseUrl: process.env.BASE_URL,
+      clientIdPreview: process.env.PLUGGY_CLIENT_ID ? `${process.env.PLUGGY_CLIENT_ID.slice(0, 8)}...` : 'not set'
+    });
+  });
 }
 
 // API Routes

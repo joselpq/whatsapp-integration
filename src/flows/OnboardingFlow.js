@@ -21,12 +21,6 @@ class OnboardingFlow {
       case ConversationState.STATES.GOAL_COMPLETE:
         return this.handleGoalComplete(userId, messageText);
         
-      case ConversationState.STATES.INCOME_COLLECTION:
-        return this.handleIncomeCollection(userId, messageText);
-        
-      case ConversationState.STATES.PLAN_CREATION:
-        return this.handlePlanCreation(userId);
-        
       default:
         return this.sendWelcome(userId);
     }
@@ -235,46 +229,54 @@ Primeira meta: economizar R$${Math.round(monthlySavings/4)} esta semana! 🚀`,
         description: JSON.stringify(goalData)
       });
       
-      // Generate AI summary
-      const goalIntelligence = new GoalIntelligence();
-      const summary = await goalIntelligence.createGoalSummary(goalData, userId);
+      // Mark onboarding as complete - goal discovery is done
+      await ConversationState.completeOnboarding(userId);
       
-      // Update state to income collection
-      await ConversationState.updateUserState(
-        userId,
-        ConversationState.STATES.INCOME_COLLECTION,
-        {
-          goalId: goal.id,
-          goalType: goalData.goal_type,
-          goalComplete: true,
-          stage: 'goal_completed'
-        }
-      );
+      // Generate final goal confirmation message
+      const goalSummary = this.formatGoalSummary(goalData);
       
       return {
-        message: summary
+        message: `Então seu objetivo é: ${goalSummary}! 🎯
+
+Agora você tem sua meta bem definida. Sucesso na sua jornada financeira! 💪`,
+        completeOnboarding: true
       };
       
     } catch (error) {
       console.error('❌ Error completing goal definition:', error);
       
-      // Fallback - still proceed to income collection
-      await ConversationState.updateUserState(
-        userId,
-        ConversationState.STATES.INCOME_COLLECTION,
-        { stage: 'goal_completed_fallback' }
-      );
+      // Fallback - complete onboarding anyway
+      await ConversationState.completeOnboarding(userId);
       
       return {
-        message: "🎯 Objetivo definido! Vamos criar seu plano financeiro personalizado.\n\nPara começar, me conta quanto você ganha por mês?"
+        message: "Então seu objetivo está definido! 🎯 Agora você tem uma meta clara para trabalhar. Boa sorte! 💪",
+        completeOnboarding: true
       };
     }
   }
   
+  static formatGoalSummary(goalData) {
+    const item = goalData.item || goalData.goal_type || 'sua meta financeira';
+    const amount = goalData.amount ? `R$ ${goalData.amount.toLocaleString('pt-BR')}` : '';
+    const timeline = goalData.timeline || '';
+    
+    let summary = item;
+    
+    if (amount && timeline) {
+      summary += ` de ${amount} até ${timeline}`;
+    } else if (amount) {
+      summary += ` de ${amount}`;
+    } else if (timeline) {
+      summary += ` até ${timeline}`;
+    }
+    
+    return summary;
+  }
+  
   static async handleGoalComplete(userId, messageText) {
-    // This state shouldn't normally be reached, but handle gracefully
+    // Goal is already complete - remind user and keep conversation open for new goals
     return {
-      message: "Seu objetivo já está definido! Vamos para o próximo passo.\n\nMe conta quanto você ganha por mês para criar seu plano personalizado."
+      message: "Seu objetivo financeiro já está bem definido! 🎯 Se quiser definir uma nova meta, é só me contar!"
     };
   }
   

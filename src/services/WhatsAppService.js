@@ -251,114 +251,26 @@ class WhatsAppService {
     try {
       const messageText = message.text?.body || '';
       
-      // 1. Determine user's conversation state
+      // Simplified Arnaldo: Focus ONLY on goal discovery
       const userState = await ConversationState.getUserState(user.id);
       
-      // 2. Handle onboarding flow first
+      // Handle goal discovery flow
       if (await ConversationState.needsGuidance(user.id)) {
-        const onboardingResponse = await OnboardingFlow.handleOnboarding(
+        const goalResponse = await OnboardingFlow.handleOnboarding(
           user.id, 
           userState, 
           messageText
         );
         
-        // Send structured onboarding message
-        await this.sendMessage(user.phone_number, onboardingResponse.message);
-        
-        // State updates are now handled inside OnboardingFlow
-        // Complete onboarding if done
-        if (onboardingResponse.completeOnboarding) {
-          await ConversationState.completeOnboarding(user.id);
-        }
-        
+        await this.sendMessage(user.phone_number, goalResponse.message);
         return;
       }
       
-      // 3. Handle emergency mode
-      if (userState === ConversationState.STATES.EMERGENCY_MODE) {
-        const emergencyResponse = OnboardingFlow.getEmergencyResponse();
-        await this.sendMessage(user.phone_number, emergencyResponse.message);
-        return;
-      }
-      
-      // 4. Build user context for normal operations
-      const context = await UserContext.build(user.id);
-      
-      // 5. Check if it's an income message
-      if (IncomeParser.isIncomeMessage(messageText)) {
-        const income = IncomeParser.parse(messageText);
-        
-        if (income) {
-          await this.updateUserIncome(user.id, income.amount);
-          
-          // If in onboarding, move to next step
-          if (userState === ConversationState.STATES.INCOME_COLLECTION) {
-            const response = await OnboardingFlow.handleIncomeCollection(user.id, messageText);
-            await this.sendMessage(user.phone_number, response.message);
-            
-            if (response.completeOnboarding) {
-              await ConversationState.completeOnboarding(user.id);
-            }
-            return;
-          }
-          
-          // Regular income update response
-          const aiResponse = await this.arnaldo.processMessage(
-            `User updated monthly income to R$${income.amount.toFixed(2)}. Give brief confirmation and ask how to help with their budget.`,
-            context
-          );
-          await this.sendMessage(user.phone_number, aiResponse);
-          
-          await this.trackEvent(user.id, 'income_updated', {
-            amount: income.amount
-          });
-          
-          return;
-        }
-      }
-      
-      // 6. Check if it's an expense message
-      if (ExpenseParser.isExpenseMessage(messageText)) {
-        const expense = ExpenseParser.parse(messageText);
-        
-        if (expense) {
-          // Save expense to database
-          await Expense.create({
-            userId: user.id,
-            amount: expense.amount,
-            category: expense.category,
-            description: expense.description
-          });
-          
-          // Get updated expense context
-          const updatedContext = await UserContext.build(user.id);
-          
-          // Generate AI response about the expense
-          const prompt = `User logged expense: ${expense.description} R$${expense.amount.toFixed(2)} (${expense.category}). 
-          Today total: R$${updatedContext.expenses.todayTotal.toFixed(2)}
-          Daily budget: R$${updatedContext.expenses.dailyBudget.toFixed(2)}
-          
-          Give brief, encouraging feedback.`;
-          
-          const aiResponse = await this.arnaldo.processMessage(prompt, updatedContext);
-          await this.sendMessage(user.phone_number, aiResponse);
-          
-          await this.trackEvent(user.id, 'expense_logged', {
-            amount: expense.amount,
-            category: expense.category
-          });
-          
-          return;
-        }
-      }
-      
-      // 7. For general messages, use AI processing
-      const aiResponse = await this.arnaldo.processMessage(messageText, context);
+      // If user has completed goal, redirect back to goal discovery
+      const aiResponse = await this.arnaldo.processGoalDiscoveryMessage(messageText, user.id);
       await this.sendMessage(user.phone_number, aiResponse);
       
-      await this.trackEvent(user.id, 'message_sent', {
-        hasIncome: context.profile?.monthly_income ? true : false,
-        isOnboarded: context.profile?.onboarding_completed || false,
+      await this.trackEvent(user.id, 'goal_discovery_message', {
         state: userState
       });
       
