@@ -113,15 +113,32 @@ STAY FOCUSED: Only talk about GOALS. Redirect off-topic conversations back to go
     try {
       console.log(`🎯 Processing message for user ${userId}: "${message}"`);
       
-      // Get conversation history directly from database
-      const conversationHistory = await this.getSimpleConversationHistory(userId);
+      // Get conversation history using existing working service
+      const fullContext = await this.memory.loadConversationContext(userId);
+      const aiContext = this.memory.formatForAI(fullContext);
+      const conversationHistory = aiContext.conversationHistory || [];
       
       // Build messages for ChatGPT
       const messages = [
-        { role: 'system', content: this.systemPrompt },
-        ...conversationHistory,
-        { role: 'user', content: message }
+        { role: 'system', content: this.systemPrompt }
       ];
+      
+      // Add conversation history (last 30 messages)
+      if (conversationHistory.length > 0) {
+        const recentHistory = conversationHistory.slice(-30);
+        recentHistory.forEach(msg => {
+          messages.push({
+            role: msg.role,
+            content: msg.content
+          });
+        });
+      }
+      
+      // Add current message
+      messages.push({
+        role: 'user',
+        content: message
+      });
 
       console.log(`📚 Sending ${messages.length - 2} messages of history to ChatGPT`);
 
@@ -139,50 +156,20 @@ STAY FOCUSED: Only talk about GOALS. Redirect off-topic conversations back to go
       
     } catch (error) {
       console.error('❌ ChatGPT error:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Stack:', error.stack);
+      
+      // Test if OpenAI key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        console.error('❌ OPENAI_API_KEY not configured!');
+        return 'Erro de configuração da API. Contate o suporte.';
+      }
       
       // Fallback response
       return 'Me conta mais sobre seu objetivo financeiro! Quero te ajudar a definir sua meta 😊';
     }
   }
   
-  async getSimpleConversationHistory(userId) {
-    try {
-      const db = require('../database/db');
-      const query = `
-        SELECT 
-          m.direction,
-          m.content,
-          m.created_at
-        FROM messages m
-        JOIN conversations c ON m.conversation_id = c.id
-        WHERE c.user_id = $1
-        ORDER BY m.created_at ASC
-        LIMIT 30
-      `;
-      
-      const result = await db.query(query, [userId]);
-      
-      return result.rows.map(msg => {
-        // Parse content if it's JSON
-        let messageContent = msg.content;
-        try {
-          const parsed = JSON.parse(msg.content);
-          messageContent = parsed.text || parsed.body || msg.content;
-        } catch (e) {
-          // If not JSON, use as is
-        }
-        
-        return {
-          role: msg.direction === 'inbound' ? 'user' : 'assistant',
-          content: messageContent
-        };
-      });
-      
-    } catch (error) {
-      console.error('Error loading conversation history:', error);
-      return [];
-    }
-  }
 }
 
 module.exports = ArnaldoAI;

@@ -277,7 +277,9 @@ Me fala com suas palavras!`;
       }
       
       // Any other message - send to ChatGPT with full conversation history
+      console.log(`🤖 Sending to ChatGPT: "${messageText}" for user ${user.id}`);
       const aiResponse = await this.arnaldo.processGoalDiscoveryMessage(messageText, user.id);
+      console.log(`🤖 ChatGPT response: "${aiResponse}"`);
       await this.sendMessage(user.phone_number, aiResponse);
       
     } catch (error) {
