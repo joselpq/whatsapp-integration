@@ -35,8 +35,11 @@ class ArnaldoAgent {
       // Check if this is the user's first message
       const isFirstMessage = await this._isFirstMessage(userId);
       
+      console.log(`🔍 User ${userId} first message check: ${isFirstMessage}`);
+      
       if (isFirstMessage) {
         // Send welcome message
+        console.log(`👋 Sending welcome message to ${phoneNumber}`);
         await this._sendWelcomeMessage(phoneNumber);
         return { 
           processed: true, 
@@ -124,7 +127,25 @@ class ArnaldoAgent {
         WHERE c.user_id = $1 AND m.direction = 'outbound'
       `;
       const result = await db.query(query, [userId]);
-      return parseInt(result.rows[0].count) === 0;
+      const messageCount = parseInt(result.rows[0].count);
+      
+      console.log(`📊 User ${userId} has ${messageCount} previous outbound messages`);
+      
+      // Also check if user was recently created (within last 5 minutes) as backup
+      const userQuery = `
+        SELECT created_at FROM users WHERE id = $1
+      `;
+      const userResult = await db.query(userQuery, [userId]);
+      const createdAt = new Date(userResult.rows[0].created_at);
+      const now = new Date();
+      const minutesSinceCreation = (now - createdAt) / (1000 * 60);
+      
+      console.log(`⏰ User ${userId} created ${minutesSinceCreation.toFixed(1)} minutes ago`);
+      
+      const isFirst = messageCount === 0;
+      console.log(`✅ User ${userId} is first message: ${isFirst}`);
+      
+      return isFirst;
     } catch (error) {
       console.error('Error checking first message:', error);
       return true; // Default to showing welcome if unsure

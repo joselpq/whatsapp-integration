@@ -108,6 +108,8 @@ IMPORTANTE: Foque APENAS em descobrir o objetivo. Não fale sobre renda, gastos,
       
       const result = await db.query(query, [userId]);
       
+      console.log(`📚 Loaded ${result.rows.length} historical messages for user ${userId}`);
+      
       return result.rows.map(row => {
         // Extract text content from JSON if needed
         let content = row.content;

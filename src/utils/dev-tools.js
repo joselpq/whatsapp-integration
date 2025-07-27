@@ -6,15 +6,19 @@ class DevTools {
     try {
       console.log(`🔄 Resetting user data for ${phoneNumber}...`);
       
-      // Remove + and keep just numbers
+      // Try multiple phone number formats
       const cleanPhone = phoneNumber.replace(/\D/g, '');
+      const withPlus = `+${cleanPhone}`;
+      const withoutPlus = cleanPhone;
       
-      // Get user ID first
+      console.log(`📱 Trying formats: ${phoneNumber}, ${withPlus}, ${withoutPlus}`);
+      
+      // Get user ID first - try all possible formats
       const userQuery = `
-        SELECT id FROM users 
-        WHERE phone_number = $1 OR phone_number = $2
+        SELECT id, phone_number FROM users 
+        WHERE phone_number IN ($1, $2, $3)
       `;
-      const userResult = await db.query(userQuery, [phoneNumber, cleanPhone]);
+      const userResult = await db.query(userQuery, [phoneNumber, withPlus, withoutPlus]);
       
       if (userResult.rows.length === 0) {
         console.log('❌ User not found');
@@ -22,17 +26,31 @@ class DevTools {
       }
       
       const userId = userResult.rows[0].id;
-      console.log(`👤 Found user ID: ${userId}`);
+      const foundPhone = userResult.rows[0].phone_number;
+      console.log(`👤 Found user ID: ${userId} with phone: ${foundPhone}`);
+      
+      // Count what we're about to delete
+      const messageCount = await db.query('SELECT COUNT(*) as count FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)', [userId]);
+      const conversationCount = await db.query('SELECT COUNT(*) as count FROM conversations WHERE user_id = $1', [userId]);
+      
+      console.log(`📊 Found ${messageCount.rows[0].count} messages and ${conversationCount.rows[0].count} conversations to delete`);
       
       // Delete user data in reverse dependency order
-      await db.query('DELETE FROM analytics_events WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM expenses WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM goals WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM daily_summaries WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM insights WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)', [userId]);
-      await db.query('DELETE FROM conversations WHERE user_id = $1', [userId]);
-      await db.query('DELETE FROM user_states WHERE user_id = $1', [userId]);
+      const deletions = [
+        { table: 'analytics_events', query: 'DELETE FROM analytics_events WHERE user_id = $1' },
+        { table: 'expenses', query: 'DELETE FROM expenses WHERE user_id = $1' },
+        { table: 'goals', query: 'DELETE FROM goals WHERE user_id = $1' },
+        { table: 'daily_summaries', query: 'DELETE FROM daily_summaries WHERE user_id = $1' },
+        { table: 'insights', query: 'DELETE FROM insights WHERE user_id = $1' },
+        { table: 'messages', query: 'DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)' },
+        { table: 'conversations', query: 'DELETE FROM conversations WHERE user_id = $1' },
+        { table: 'user_states', query: 'DELETE FROM user_states WHERE user_id = $1' }
+      ];
+      
+      for (const deletion of deletions) {
+        const result = await db.query(deletion.query, [userId]);
+        console.log(`🗑️  Deleted ${result.rowCount} rows from ${deletion.table}`);
+      }
       
       // Reset user profile to defaults and reset created_at to be treated as new user
       await db.query(`
