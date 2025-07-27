@@ -100,8 +100,8 @@ class WhatsAppMessagingService {
       // Find or create conversation
       const conversation = await Conversation.findOrCreate(user.id, message.from);
       
-      // Update conversation with latest message timestamp
-      await Conversation.updateLastMessage(conversation.id);
+      // Update conversation window with latest message timestamp
+      await Conversation.updateWindow(conversation.id, new Date());
       
       // Store the incoming message
       const storedMessage = await Message.create({
