@@ -159,6 +159,80 @@ class DevTools {
       return [];
     }
   }
+
+  static async resetUserById(userId) {
+    try {
+      console.log(`🚨 EMERGENCY RESET for user ID: ${userId}`);
+      
+      // Verify user exists
+      const userQuery = `SELECT id, phone_number, created_at FROM users WHERE id = $1`;
+      const userResult = await db.query(userQuery, [userId]);
+      
+      if (userResult.rows.length === 0) {
+        console.log('❌ User ID not found');
+        return { success: false, message: 'User ID not found' };
+      }
+      
+      const user = userResult.rows[0];
+      console.log(`👤 Found user: ID=${user.id}, Phone=${user.phone_number}, Created=${user.created_at}`);
+      
+      // Count what we're about to delete
+      const messageCount = await db.query('SELECT COUNT(*) as count FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)', [userId]);
+      const conversationCount = await db.query('SELECT COUNT(*) as count FROM conversations WHERE user_id = $1', [userId]);
+      
+      console.log(`📊 Found ${messageCount.rows[0].count} messages and ${conversationCount.rows[0].count} conversations to delete`);
+      
+      // Delete user data in reverse dependency order
+      const deletions = [
+        { table: 'analytics_events', query: 'DELETE FROM analytics_events WHERE user_id = $1' },
+        { table: 'expenses', query: 'DELETE FROM expenses WHERE user_id = $1' },
+        { table: 'goals', query: 'DELETE FROM goals WHERE user_id = $1' },
+        { table: 'daily_summaries', query: 'DELETE FROM daily_summaries WHERE user_id = $1' },
+        { table: 'insights', query: 'DELETE FROM insights WHERE user_id = $1' },
+        { table: 'messages', query: 'DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)' },
+        { table: 'conversations', query: 'DELETE FROM conversations WHERE user_id = $1' },
+        { table: 'user_states', query: 'DELETE FROM user_states WHERE user_id = $1' }
+      ];
+      
+      let totalDeleted = 0;
+      for (const deletion of deletions) {
+        const result = await db.query(deletion.query, [userId]);
+        console.log(`🗑️  Deleted ${result.rowCount} rows from ${deletion.table}`);
+        totalDeleted += result.rowCount;
+      }
+      
+      // Reset user profile to defaults and reset created_at to be treated as new user
+      await db.query(`
+        UPDATE users 
+        SET 
+          monthly_income = NULL,
+          payday = NULL,
+          family_size = 1,
+          onboarding_completed = FALSE,
+          premium_subscriber = FALSE,
+          premium_started_at = NULL,
+          created_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $1
+      `, [userId]);
+      
+      console.log(`✅ User ${userId} reset completed! Deleted ${totalDeleted} total records`);
+      
+      return {
+        success: true,
+        message: `User ${userId} reset successfully`,
+        deletedRecords: totalDeleted,
+        phone: user.phone_number
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in emergency reset:', error);
+      return {
+        success: false,
+        message: `Reset failed: ${error.message}`
+      };
+    }
+  }
 }
 
 module.exports = DevTools;

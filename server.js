@@ -191,6 +191,18 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     const users = await DevTools.listRecentUsers();
     res.json(users);
   });
+  
+  // Emergency reset by user ID
+  app.post('/dev/emergency-reset', async (req, res) => {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    const result = await DevTools.resetUserById(userId);
+    res.json(result);
+  });
 }
 
 // ============================================
