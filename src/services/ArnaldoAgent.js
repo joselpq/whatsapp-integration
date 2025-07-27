@@ -54,6 +54,7 @@ class ArnaldoAgent {
       // Log if goal was completed
       if (aiResponse.goalComplete) {
         console.log(`🎯 Goal discovery complete for user ${userId}!`);
+        // Goal is complete - no further processing needed until user initiates new conversation
         // Could trigger additional actions here like updating user profile
         // or notifying other services
       }
@@ -133,19 +134,19 @@ class ArnaldoAgent {
   async _sendWelcomeMessage(phoneNumber) {
     const welcomeMessage = `Oi! Sou o Arnaldo, seu consultor financeiro pessoal! 👋
 
-Vou te ajudar a definir e alcançar seu principal objetivo financeiro.
+Vou te ajudar a organizar suas finanças e realizar seus sonhos.
 
-Me conta: o que você mais quer conquistar? 
+Me conta: qual é seu MAIOR objetivo financeiro agora?
 
 Pode ser qualquer coisa:
-💰 Criar uma reserva de emergência
-🏠 Comprar casa própria
-🚗 Trocar de carro
-📱 Comprar um celular novo
-✈️ Fazer aquela viagem dos sonhos
-💳 Quitar as dívidas
+💰 Criar reserva de emergência
+🏠 Comprar casa, carro, celular...
+💳 Quitar dívidas
+💡 Economizar mais dinheiro
+🎓 Fazer curso, viagem...
+🤷 Não sei bem ainda
 
-Fala aí, qual é seu sonho? 😊`;
+Me fala com suas palavras!`;
 
     await this.messagingService.sendMessage(phoneNumber, welcomeMessage);
   }
