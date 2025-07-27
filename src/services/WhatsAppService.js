@@ -251,12 +251,43 @@ class WhatsAppService {
     try {
       const messageText = message.text?.body || '';
       
-      // ULTRA-SIMPLE LOGIC: Check if this is the first message
-      const messageCount = await this.getMessageCount(user.id);
+      // SUPER SIMPLE: Check if this is user's first ever message
+      const isFirstMessage = await this.isFirstMessage(user.id);
       
-      if (messageCount === 0) {
-        // First message - send welcome
-        const welcomeMessage = `Oi! Sou o Arnaldo, seu consultor financeiro pessoal! 👋
+      if (isFirstMessage) {
+        // Send welcome message
+        await this.sendWelcomeMessage(user.phone_number);
+      } else {
+        // Send to Arnaldo AI
+        const response = await this.arnaldo.chat(messageText, user.id);
+        await this.sendMessage(user.phone_number, response);
+      }
+      
+    } catch (error) {
+      console.error('Error in processAndRespond:', error);
+      await this.sendMessage(user.phone_number, 'Desculpa, tive um problema técnico. Pode tentar novamente?');
+    }
+  }
+  
+  async isFirstMessage(userId) {
+    try {
+      // Check if user has any previous outbound messages from Arnaldo
+      const query = `
+        SELECT COUNT(*) as count 
+        FROM messages m 
+        JOIN conversations c ON m.conversation_id = c.id 
+        WHERE c.user_id = $1 AND m.direction = 'outbound'
+      `;
+      const result = await require('../database/db').query(query, [userId]);
+      return parseInt(result.rows[0].count) === 0;
+    } catch (error) {
+      console.error('Error checking first message:', error);
+      return true; // Default to showing welcome if unsure
+    }
+  }
+  
+  async sendWelcomeMessage(phoneNumber) {
+    const welcomeMessage = `Oi! Sou o Arnaldo, seu consultor financeiro pessoal! 👋
 
 Vou te ajudar a organizar suas finanças e realizar seus sonhos.
 
@@ -271,24 +302,8 @@ Pode ser qualquer coisa:
 🤷 Não sei bem ainda
 
 Me fala com suas palavras!`;
-        
-        await this.sendMessage(user.phone_number, welcomeMessage);
-        return;
-      }
-      
-      // Any other message - send to ChatGPT with full conversation history
-      console.log(`🤖 Sending to ChatGPT: "${messageText}" for user ${user.id}`);
-      const aiResponse = await this.arnaldo.processGoalDiscoveryMessage(messageText, user.id);
-      console.log(`🤖 ChatGPT response: "${aiResponse}"`);
-      await this.sendMessage(user.phone_number, aiResponse);
-      
-    } catch (error) {
-      console.error('Error in processAndRespond:', error);
-      
-      // Fallback message
-      const fallbackMessage = 'Oi! Tive um probleminha técnico aqui 😅 Pode repetir sua mensagem? Prometo que vou te ajudar!';
-      await this.sendMessage(user.phone_number, fallbackMessage);
-    }
+    
+    await this.sendMessage(phoneNumber, welcomeMessage);
   }
   
   async getMessageCount(userId) {
@@ -297,7 +312,7 @@ Me fala com suas palavras!`;
         SELECT COUNT(*) as count
         FROM messages m
         JOIN conversations c ON m.conversation_id = c.id
-        WHERE c.user_id = $1 AND m.direction = 'outbound'
+        WHERE c.user_id = $1 AND m.direction = 'inbound'
       `;
       const result = await require('../database/db').query(query, [userId]);
       return parseInt(result.rows[0].count);
