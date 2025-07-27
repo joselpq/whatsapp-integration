@@ -67,7 +67,7 @@ Me fala com suas palavras!`
       // Use simplified Arnaldo with full conversation context
       const ArnaldoAI = require('../services/ArnaldoAI');
       const arnaldo = new ArnaldoAI();
-      const aiResponse = await arnaldo.processGoalDiscoveryMessage(messageText, userId);
+      const aiResponse = await arnaldo.chat(messageText, userId);
       
       // Check if goal is complete in the response
       if (aiResponse.includes("então seu objetivo é:")) {
@@ -188,7 +188,7 @@ Primeira meta: economizar R$${Math.round(monthlySavings/4)} esta semana! 🚀`,
       // Use simplified Arnaldo with full conversation context
       const ArnaldoAI = require('../services/ArnaldoAI');
       const arnaldo = new ArnaldoAI();
-      const aiResponse = await arnaldo.processGoalDiscoveryMessage(messageText, userId);
+      const aiResponse = await arnaldo.chat(messageText, userId);
       
       // Check if goal is complete in the response
       if (aiResponse.includes("então seu objetivo é:")) {
