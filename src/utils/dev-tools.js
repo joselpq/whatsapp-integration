@@ -6,12 +6,20 @@ class DevTools {
     try {
       console.log(`🔄 Resetting user data for ${phoneNumber}...`);
       
+      // First, let's see what users exist
+      const allUsersQuery = `SELECT id, phone_number, created_at FROM users ORDER BY created_at DESC LIMIT 10`;
+      const allUsers = await db.query(allUsersQuery);
+      console.log(`📋 Found ${allUsers.rows.length} users in database:`);
+      allUsers.rows.forEach(user => {
+        console.log(`  - ID: ${user.id}, Phone: ${user.phone_number}, Created: ${user.created_at}`);
+      });
+      
       // Try multiple phone number formats
       const cleanPhone = phoneNumber.replace(/\D/g, '');
       const withPlus = `+${cleanPhone}`;
       const withoutPlus = cleanPhone;
       
-      console.log(`📱 Trying formats: ${phoneNumber}, ${withPlus}, ${withoutPlus}`);
+      console.log(`📱 Trying formats: "${phoneNumber}", "${withPlus}", "${withoutPlus}"`);
       
       // Get user ID first - try all possible formats
       const userQuery = `
