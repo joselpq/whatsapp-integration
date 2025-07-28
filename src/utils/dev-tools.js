@@ -233,6 +233,73 @@ class DevTools {
       };
     }
   }
+
+  static async debugMessages(userId) {
+    try {
+      console.log(`🔍 DEBUGGING MESSAGES for user ID: ${userId}`);
+      
+      // Check if user exists
+      const userQuery = `SELECT id, phone_number, created_at FROM users WHERE id = $1`;
+      const userResult = await db.query(userQuery, [userId]);
+      
+      if (userResult.rows.length === 0) {
+        return { success: false, message: 'User not found' };
+      }
+      
+      const user = userResult.rows[0];
+      console.log(`👤 User: ${user.phone_number}, Created: ${user.created_at}`);
+      
+      // Count messages using the EXACT same query as Arnaldo
+      const arnaldoQuery = `
+        SELECT 
+          m.direction,
+          m.content,
+          m.created_at
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = $1
+        ORDER BY m.created_at ASC
+      `;
+      const arnaldoResult = await db.query(arnaldoQuery, [userId]);
+      
+      // Count outbound messages (for first message detection)
+      const outboundQuery = `
+        SELECT COUNT(*) as count 
+        FROM messages m 
+        JOIN conversations c ON m.conversation_id = c.id 
+        WHERE c.user_id = $1 AND m.direction = 'outbound'
+      `;
+      const outboundResult = await db.query(outboundQuery, [userId]);
+      
+      // Get conversation count
+      const conversationQuery = `SELECT COUNT(*) as count FROM conversations WHERE user_id = $1`;
+      const conversationResult = await db.query(conversationQuery, [userId]);
+      
+      const result = {
+        success: true,
+        user: {
+          id: user.id,
+          phone: user.phone_number,
+          created: user.created_at
+        },
+        arnaldoHistoryMessages: arnaldoResult.rows.length,
+        outboundMessages: parseInt(outboundResult.rows[0].count),
+        conversations: parseInt(conversationResult.rows[0].count),
+        sampleMessages: arnaldoResult.rows.slice(0, 3).map(m => ({
+          direction: m.direction,
+          content: typeof m.content === 'string' ? m.content.substring(0, 50) + '...' : m.content,
+          created: m.created_at
+        }))
+      };
+      
+      console.log(`📊 Results:`, result);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error debugging messages:', error);
+      return { success: false, message: error.message };
+    }
+  }
 }
 
 module.exports = DevTools;

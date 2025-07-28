@@ -203,6 +203,13 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     const result = await DevTools.resetUserById(userId);
     res.json(result);
   });
+  
+  // Debug message counts for user
+  app.get('/dev/debug-messages/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const result = await DevTools.debugMessages(userId);
+    res.json(result);
+  });
 }
 
 // ============================================
