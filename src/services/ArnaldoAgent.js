@@ -54,30 +54,33 @@ class ArnaldoAgent {
       const conversationState = await this._getConversationState(userId);
       
       if (!conversationState.goalComplete) {
-        // Route to Goal Discovery
-        console.log(`🎯 Routing to Goal Discovery for user ${userId}`);
-        const goalResponse = await this.goalDiscovery.chat(content, userId);
+        // Check if we previously asked for confirmation
+        const previouslyAskedConfirmation = await this._hasAskedGoalConfirmation(userId);
         
-        // Check if user confirmed goal completion
-        if (goalResponse.goalComplete || this._isGoalConfirmation(content)) {
-          // Goal is now complete - send transition message
-          await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
+        if (previouslyAskedConfirmation && this._isGoalConfirmation(content)) {
+          // User is confirming the goal - send transition message and mark as complete
+          console.log(`✅ User confirmed goal, transitioning to expenses for ${userId}`);
           await this._sendTransitionMessage(phoneNumber);
           
           return {
             processed: true,
-            action: 'goal_completed_with_transition',
+            action: 'goal_confirmed_transitioning',
             goalComplete: true,
             sentMessage: true
           };
         } else {
-          // Still in goal discovery phase
+          // Route to Goal Discovery (either new question or asking confirmation)
+          console.log(`🎯 Routing to Goal Discovery for user ${userId}`);
+          const goalResponse = await this.goalDiscovery.chat(content, userId);
+          
+          // Send the AI response (could be question or confirmation request)
           await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
           
           return {
             processed: true,
             action: 'sent_goal_discovery_response',
             goalComplete: false,
+            askedConfirmation: goalResponse.askedConfirmation,
             sentMessage: true
           };
         }
@@ -263,11 +266,66 @@ Vamos começar: quanto você gasta por mês com moradia (aluguel, financiamento,
     }
   }
 
-  _isGoalConfirmation(message) {
-    // Check if user confirmed the goal with positive responses
-    const confirmationWords = ['sim', 'yes', 'pode', 'vamos', 'perfeito', 'certo', 'ok', 'beleza', 'ótimo'];
-    const lowerMessage = message.toLowerCase();
-    return confirmationWords.some(word => lowerMessage.includes(word));
+  async _hasAskedGoalConfirmation(userId) {
+    try {
+      const db = require('../database/db');
+      
+      // Check if we previously sent a goal confirmation question
+      const confirmationQuery = `
+        SELECT COUNT(*) as count 
+        FROM messages m 
+        JOIN conversations c ON m.conversation_id = c.id 
+        WHERE c.user_id = $1 
+        AND m.direction = 'outbound' 
+        AND m.content LIKE '%Então podemos considerar que seu objetivo é:%'
+        AND m.content LIKE '%Podemos considerar este objetivo e seguir para a próxima etapa?%'
+      `;
+      const result = await db.query(confirmationQuery, [userId]);
+      const hasAsked = parseInt(result.rows[0].count) > 0;
+      
+      console.log(`🤔 User ${userId} previously asked confirmation: ${hasAsked}`);
+      return hasAsked;
+    } catch (error) {
+      console.error('Error checking goal confirmation:', error);
+      return false;
+    }
+  }
+
+  async _isGoalConfirmation(message) {
+    // Use AI to determine if this is a confirmation response
+    try {
+      const OpenAI = require('openai');
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um classificador. Responda apenas "SIM" ou "NÃO". A mensagem do usuário é uma confirmação positiva ou concordância?'
+          },
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 10,
+      });
+
+      const response = completion.choices[0].message.content.trim().toLowerCase();
+      const isConfirmation = response.includes('sim');
+      
+      console.log(`🤖 AI classified "${message}" as confirmation: ${isConfirmation}`);
+      return isConfirmation;
+    } catch (error) {
+      console.error('Error in AI confirmation detection:', error);
+      // Fallback to simple heuristic
+      const positiveWords = ['sim', 'ok', 'pode', 'vamos', 'certo', 'perfeito'];
+      return positiveWords.some(word => message.toLowerCase().includes(word));
+    }
   }
 }
 

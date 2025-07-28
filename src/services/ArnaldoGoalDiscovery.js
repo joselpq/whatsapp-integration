@@ -88,12 +88,14 @@ IMPORTANTE: Use estimativas para CONVERGIR ao objetivo, não para dar consultori
       const response = completion.choices[0].message.content;
       console.log(`✅ Arnaldo response: "${response}"`);
       
-      // Check if goal is complete
-      const isGoalComplete = response.includes("Então podemos considerar que seu objetivo é:");
+      // Goal is only complete when user confirms, not when we ask the confirmation question
+      // We ask the question but don't mark as complete until user responds positively
+      const askedConfirmation = response.includes("Então podemos considerar que seu objetivo é:");
       
       return {
         message: response,
-        goalComplete: isGoalComplete
+        goalComplete: false, // Never auto-complete, wait for user confirmation
+        askedConfirmation: askedConfirmation
       };
       
     } catch (error) {
