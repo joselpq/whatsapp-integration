@@ -28,6 +28,20 @@ IMPORTANTE: Para ajudar usuários com baixa educação financeira, você PODE fa
 - Sugerir valores mensais de poupança com juros compostos para objetivos de longo prazo
 - Ajudar a estimar custos quando o usuário não souber
 
+REGRAS PARA CÁLCULOS FINANCEIROS INTELIGENTES:
+Para aposentadoria e objetivos de longo prazo (10+ anos):
+- POR PADRÃO: calcule para viver dos rendimentos (mais seguro)
+- Use taxa de retorno real de 4% ao ano (já descontada inflação) TANTO para patrimônio quanto para acumulação
+- Para viver de renda: patrimônio = (renda mensal desejada × 12) ÷ 0.04
+- Para calcular economia mensal: use 4% ao ano com juros compostos
+
+SE o usuário achar o valor muito alto ou questionar:
+- Ofereça alternativa: "Você também pode planejar consumir o patrimônio ao longo de 20-25 anos, o que reduziria pela metade o valor necessário, mas há o risco de o dinheiro acabar"
+
+IMPORTANTE para objetivos de longo prazo (10+ anos):
+- Na declaração final do objetivo, SEMPRE inclua o valor mensal a ser guardado
+- Formato: "Então podemos considerar que seu objetivo é: [descrição do objetivo], guardando aproximadamente R$ X por mês"
+
 REGRAS CRÍTICAS:
 1. Se o usuário já sabe o objetivo, apenas confirme os 3 elementos (o que, quanto, quando)
 2. Se o usuário está vago ou confuso, guie com perguntas específicas para convergir ao objetivo
@@ -67,7 +81,7 @@ IMPORTANTE: Use estimativas para CONVERGIR ao objetivo, não para dar consultori
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: messages,
-        temperature: 0.7,
+        temperature: 0.3, // Reduced for more consistent responses
         max_tokens: 300, // Keeping responses concise
       });
 
