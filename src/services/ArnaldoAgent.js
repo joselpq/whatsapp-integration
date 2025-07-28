@@ -61,7 +61,7 @@ class ArnaldoAgent {
         // Check if user confirmed goal completion
         if (goalResponse.goalComplete || this._isGoalConfirmation(content)) {
           // Goal is now complete - send transition message
-          await this.messagingService.sendMessage(phoneNumber, goalResponse.response);
+          await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
           await this._sendTransitionMessage(phoneNumber);
           
           return {
@@ -72,7 +72,7 @@ class ArnaldoAgent {
           };
         } else {
           // Still in goal discovery phase
-          await this.messagingService.sendMessage(phoneNumber, goalResponse.response);
+          await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
           
           return {
             processed: true,
