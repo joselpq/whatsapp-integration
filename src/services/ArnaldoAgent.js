@@ -74,7 +74,7 @@ class ArnaldoAgent {
         } else {
           // Still in goal discovery - route to AI
           console.log(`🎯 Routing to Goal Discovery for user ${userId}`);
-          const goalResponse = await this.goalDiscovery.chat(content, userId);
+          const goalResponse = await this.goalDiscovery.chat(content, phoneNumber);
           await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
           
           return {
