@@ -57,7 +57,7 @@ class ArnaldoAgent {
         // Check if we previously asked for confirmation
         const previouslyAskedConfirmation = await this._hasAskedGoalConfirmation(userId);
         
-        if (previouslyAskedConfirmation && this._isGoalConfirmation(content)) {
+        if (previouslyAskedConfirmation && await this._isGoalConfirmation(content)) {
           // User is confirming the goal - send transition message and mark as complete
           console.log(`✅ User confirmed goal, transitioning to expenses for ${userId}`);
           await this._sendTransitionMessage(phoneNumber);
