@@ -1,4 +1,5 @@
 const ArnaldoGoalDiscovery = require('./ArnaldoGoalDiscovery');
+const ArnaldoMonthlyExpenses = require('./ArnaldoMonthlyExpenses');
 const WhatsAppMessagingService = require('./WhatsAppMessagingService');
 
 /**
@@ -11,7 +12,8 @@ const WhatsAppMessagingService = require('./WhatsAppMessagingService');
  */
 class ArnaldoAgent {
   constructor() {
-    this.arnaldoAI = new ArnaldoGoalDiscovery();
+    this.goalDiscovery = new ArnaldoGoalDiscovery();
+    this.monthlyExpenses = new ArnaldoMonthlyExpenses();
     this.messagingService = new WhatsAppMessagingService();
   }
 
@@ -48,26 +50,64 @@ class ArnaldoAgent {
         };
       }
 
-      // Use Arnaldo AI for goal discovery
-      const aiResponse = await this.arnaldoAI.chat(content, userId);
+      // Check conversation state to determine which AI service to use
+      const conversationState = await this._getConversationState(userId);
       
-      // Send the AI response
-      await this.messagingService.sendMessage(phoneNumber, aiResponse.message);
-      
-      // Log if goal was completed
-      if (aiResponse.goalComplete) {
-        console.log(`🎯 Goal discovery complete for user ${userId}!`);
-        // Goal is complete - no further processing needed until user initiates new conversation
-        // Could trigger additional actions here like updating user profile
-        // or notifying other services
+      if (!conversationState.goalComplete) {
+        // Route to Goal Discovery
+        console.log(`🎯 Routing to Goal Discovery for user ${userId}`);
+        const goalResponse = await this.goalDiscovery.chat(content, userId);
+        
+        // Check if user confirmed goal completion
+        if (goalResponse.goalComplete || this._isGoalConfirmation(content)) {
+          // Goal is now complete - send transition message
+          await this.messagingService.sendMessage(phoneNumber, goalResponse.response);
+          await this._sendTransitionMessage(phoneNumber);
+          
+          return {
+            processed: true,
+            action: 'goal_completed_with_transition',
+            goalComplete: true,
+            sentMessage: true
+          };
+        } else {
+          // Still in goal discovery phase
+          await this.messagingService.sendMessage(phoneNumber, goalResponse.response);
+          
+          return {
+            processed: true,
+            action: 'sent_goal_discovery_response',
+            goalComplete: false,
+            sentMessage: true
+          };
+        }
+      } else if (!conversationState.expensesComplete) {
+        // Route to Monthly Expenses Discovery
+        console.log(`💰 Routing to Monthly Expenses for user ${userId}`);
+        const expenseResponse = await this.monthlyExpenses.processMessage(phoneNumber, content);
+        
+        // Send the AI response
+        await this.messagingService.sendMessage(phoneNumber, expenseResponse.response);
+        
+        if (expenseResponse.expensesComplete) {
+          console.log(`✅ Monthly expenses discovery complete for user ${userId}!`);
+        }
+        
+        return {
+          processed: true,
+          action: 'sent_expenses_response',
+          expensesComplete: expenseResponse.expensesComplete,
+          sentMessage: true
+        };
+      } else {
+        // Both goal and expenses are complete - conversation is finished
+        console.log(`🏁 Conversation complete for user ${userId} - not responding`);
+        return {
+          processed: false,
+          reason: 'conversation_complete',
+          sentMessage: false
+        };
       }
-      
-      return {
-        processed: true,
-        action: 'sent_ai_response',
-        goalComplete: aiResponse.goalComplete,
-        sentMessage: true
-      };
 
     } catch (error) {
       console.error('❌ Error processing message:', error);
@@ -170,6 +210,64 @@ Pode ser qualquer coisa:
 Me fala com suas palavras!`;
 
     await this.messagingService.sendMessage(phoneNumber, welcomeMessage);
+  }
+
+  async _sendTransitionMessage(phoneNumber) {
+    const transitionMessage = `Perfeito! Agora vamos entender seus gastos mensais para criar um plano de economia eficiente. 📊
+
+Vamos começar: quanto você gasta por mês com moradia (aluguel, financiamento, condomínio)?`;
+
+    await this.messagingService.sendMessage(phoneNumber, transitionMessage);
+  }
+
+  async _getConversationState(userId) {
+    try {
+      const db = require('../database/db');
+      
+      // Check if goal discovery is complete by looking for goal completion message
+      const goalCompleteQuery = `
+        SELECT COUNT(*) as count 
+        FROM messages m 
+        JOIN conversations c ON m.conversation_id = c.id 
+        WHERE c.user_id = $1 
+        AND m.direction = 'outbound' 
+        AND m.content LIKE '%Então podemos considerar que seu objetivo é:%'
+      `;
+      const goalResult = await db.query(goalCompleteQuery, [userId]);
+      const goalComplete = parseInt(goalResult.rows[0].count) > 0;
+      
+      // Check if expenses discovery is complete
+      const expensesCompleteQuery = `
+        SELECT COUNT(*) as count 
+        FROM messages m 
+        JOIN conversations c ON m.conversation_id = c.id 
+        WHERE c.user_id = $1 
+        AND m.direction = 'outbound' 
+        AND m.content LIKE '%então essa é a estimativa dos seus custos mensais:%'
+      `;
+      const expensesResult = await db.query(expensesCompleteQuery, [userId]);
+      const expensesComplete = parseInt(expensesResult.rows[0].count) > 0;
+      
+      console.log(`📊 User ${userId} conversation state: goal=${goalComplete}, expenses=${expensesComplete}`);
+      
+      return {
+        goalComplete,
+        expensesComplete
+      };
+    } catch (error) {
+      console.error('Error getting conversation state:', error);
+      return {
+        goalComplete: false,
+        expensesComplete: false
+      };
+    }
+  }
+
+  _isGoalConfirmation(message) {
+    // Check if user confirmed the goal with positive responses
+    const confirmationWords = ['sim', 'yes', 'pode', 'vamos', 'perfeito', 'certo', 'ok', 'beleza', 'ótimo'];
+    const lowerMessage = message.toLowerCase();
+    return confirmationWords.some(word => lowerMessage.includes(word));
   }
 }
 
