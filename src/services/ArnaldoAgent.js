@@ -50,17 +50,20 @@ class ArnaldoAgent {
         };
       }
 
-      // Check conversation state to determine which AI service to use
+      // Get conversation state to check what phase we're in
       const conversationState = await this._getConversationState(userId);
       
+      // Phase 1: Goal Discovery
       if (!conversationState.goalComplete) {
-        // Check if we previously asked for confirmation
-        const previouslyAskedConfirmation = await this._hasAskedGoalConfirmation(userId);
+        // Check if last message was goal confirmation question
+        const lastMessage = await this._getLastOutboundMessage(userId);
+        const askedGoalConfirmation = lastMessage && lastMessage.includes('Podemos considerar este objetivo e seguir para a próxima etapa?');
         
-        if (previouslyAskedConfirmation && await this._isGoalConfirmation(content)) {
-          // User is confirming the goal - send transition message and mark as complete
-          console.log(`✅ User confirmed goal, transitioning to expenses for ${userId}`);
+        if (askedGoalConfirmation && this._isAffirmativeResponse(content)) {
+          // User confirmed goal - transition to expenses
+          console.log(`✅ User confirmed goal with "${content}", transitioning to expenses`);
           await this._sendTransitionMessage(phoneNumber);
+          await this._markGoalComplete(userId);
           
           return {
             processed: true,
@@ -69,31 +72,29 @@ class ArnaldoAgent {
             sentMessage: true
           };
         } else {
-          // Route to Goal Discovery (either new question or asking confirmation)
+          // Still in goal discovery - route to AI
           console.log(`🎯 Routing to Goal Discovery for user ${userId}`);
           const goalResponse = await this.goalDiscovery.chat(content, userId);
-          
-          // Send the AI response (could be question or confirmation request)
           await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
           
           return {
             processed: true,
             action: 'sent_goal_discovery_response',
             goalComplete: false,
-            askedConfirmation: goalResponse.askedConfirmation,
             sentMessage: true
           };
         }
-      } else if (!conversationState.expensesComplete) {
-        // Route to Monthly Expenses Discovery
+      } 
+      // Phase 2: Monthly Expenses Discovery
+      else if (!conversationState.expensesComplete) {
         console.log(`💰 Routing to Monthly Expenses for user ${userId}`);
         const expenseResponse = await this.monthlyExpenses.processMessage(phoneNumber, content);
-        
-        // Send the AI response
         await this.messagingService.sendMessage(phoneNumber, expenseResponse.response);
         
+        // Check if expenses are complete
         if (expenseResponse.expensesComplete) {
           console.log(`✅ Monthly expenses discovery complete for user ${userId}!`);
+          await this._markExpensesComplete(userId);
         }
         
         return {
@@ -102,7 +103,9 @@ class ArnaldoAgent {
           expensesComplete: expenseResponse.expensesComplete,
           sentMessage: true
         };
-      } else {
+      } 
+      // Phase 3: Both complete - conversation finished
+      else {
         // Both goal and expenses are complete - conversation is finished
         console.log(`🏁 Conversation complete for user ${userId} - not responding`);
         return {
@@ -227,14 +230,14 @@ Vamos começar: quanto você gasta por mês com moradia (aluguel, financiamento,
     try {
       const db = require('../database/db');
       
-      // Check if goal discovery is complete by looking for goal completion message
+      // Check if we sent the transition message (indicates goal is complete)
       const goalCompleteQuery = `
         SELECT COUNT(*) as count 
         FROM messages m 
         JOIN conversations c ON m.conversation_id = c.id 
         WHERE c.user_id = $1 
         AND m.direction = 'outbound' 
-        AND m.content LIKE '%Então podemos considerar que seu objetivo é:%'
+        AND m.content LIKE '%Perfeito! Agora vamos entender seus gastos mensais%'
       `;
       const goalResult = await db.query(goalCompleteQuery, [userId]);
       const goalComplete = parseInt(goalResult.rows[0].count) > 0;
@@ -266,65 +269,58 @@ Vamos começar: quanto você gasta por mês com moradia (aluguel, financiamento,
     }
   }
 
-  async _hasAskedGoalConfirmation(userId) {
+  async _getLastOutboundMessage(userId) {
     try {
       const db = require('../database/db');
-      
-      // Check if we previously sent a goal confirmation question
-      const confirmationQuery = `
-        SELECT COUNT(*) as count 
+      const query = `
+        SELECT m.content 
         FROM messages m 
         JOIN conversations c ON m.conversation_id = c.id 
-        WHERE c.user_id = $1 
-        AND m.direction = 'outbound' 
-        AND m.content LIKE '%Então podemos considerar que seu objetivo é:%'
-        AND m.content LIKE '%Podemos considerar este objetivo e seguir para a próxima etapa?%'
+        WHERE c.user_id = $1 AND m.direction = 'outbound' 
+        ORDER BY m.created_at DESC 
+        LIMIT 1
       `;
-      const result = await db.query(confirmationQuery, [userId]);
-      const hasAsked = parseInt(result.rows[0].count) > 0;
-      
-      console.log(`🤔 User ${userId} previously asked confirmation: ${hasAsked}`);
-      return hasAsked;
+      const result = await db.query(query, [userId]);
+      return result.rows.length > 0 ? result.rows[0].content : null;
     } catch (error) {
-      console.error('Error checking goal confirmation:', error);
+      console.error('Error getting last outbound message:', error);
+      return null;
+    }
+  }
+
+  _isAffirmativeResponse(message) {
+    const positive = ['sim', 'pode', 'vamos', 'ok', 'certo', 'perfeito', 'beleza', 'ótimo', 'claro', 'com certeza'];
+    const negative = ['não', 'nao', 'nunca', 'jamais', 'negativo'];
+    const lower = message.toLowerCase();
+    
+    const hasPositive = positive.some(word => lower.includes(word));
+    const hasNegative = negative.some(word => lower.includes(word));
+    
+    const isAffirmative = hasPositive && !hasNegative;
+    console.log(`🤔 Checking affirmative for "${message}": positive=${hasPositive}, negative=${hasNegative}, result=${isAffirmative}`);
+    
+    return isAffirmative;
+  }
+
+  async _markGoalComplete(userId) {
+    try {
+      // We can track this in a simple way - the presence of transition message indicates goal is complete
+      console.log(`📌 Marking goal as complete for user ${userId}`);
+      return true;
+    } catch (error) {
+      console.error('Error marking goal complete:', error);
       return false;
     }
   }
 
-  async _isGoalConfirmation(message) {
-    // Use AI to determine if this is a confirmation response
+  async _markExpensesComplete(userId) {
     try {
-      const OpenAI = require('openai');
-      const openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um classificador. Responda apenas "SIM" ou "NÃO". A mensagem do usuário é uma confirmação positiva ou concordância?'
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 10,
-      });
-
-      const response = completion.choices[0].message.content.trim().toLowerCase();
-      const isConfirmation = response.includes('sim');
-      
-      console.log(`🤖 AI classified "${message}" as confirmation: ${isConfirmation}`);
-      return isConfirmation;
+      // Similar simple tracking
+      console.log(`📌 Marking expenses as complete for user ${userId}`);
+      return true;
     } catch (error) {
-      console.error('Error in AI confirmation detection:', error);
-      // Fallback to simple heuristic
-      const positiveWords = ['sim', 'ok', 'pode', 'vamos', 'certo', 'perfeito'];
-      return positiveWords.some(word => message.toLowerCase().includes(word));
+      console.error('Error marking expenses complete:', error);
+      return false;
     }
   }
 }

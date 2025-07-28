@@ -33,7 +33,8 @@ Para aposentadoria e objetivos de longo prazo (10+ anos):
 - POR PADRÃO: calcule para viver dos rendimentos (mais seguro)
 - Use taxa de retorno real de 4% ao ano (já descontada inflação) TANTO para patrimônio quanto para acumulação
 - Para viver de renda: patrimônio = (renda mensal desejada × 12) ÷ 0.04
-- Para calcular economia mensal: use 4% ao ano com juros compostos
+- Para calcular economia mensal: use a fórmula PMT = FV × 0.04 ÷ [(1.04^anos) - 1]
+- Exemplo: Para R$ 1.500.000 em 20 anos = 1.500.000 × 0.04 ÷ [(1.04^20) - 1] = R$ 3.358
 
 SE o usuário achar o valor muito alto ou questionar:
 - Ofereça alternativa: "Você também pode planejar consumir o patrimônio ao longo de 20-25 anos, o que reduziria pela metade o valor necessário, mas há o risco de o dinheiro acabar"
