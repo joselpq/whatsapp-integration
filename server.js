@@ -211,6 +211,26 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     res.json(result);
   });
   
+  // Store last error for debugging
+  let lastError = null;
+  
+  // Override console.error to capture errors
+  const originalConsoleError = console.error;
+  console.error = function(...args) {
+    if (args[0] && args[0].includes('❌ Error processing message')) {
+      lastError = {
+        timestamp: new Date().toISOString(),
+        error: args[1]
+      };
+    }
+    originalConsoleError.apply(console, args);
+  };
+  
+  // Get last error
+  app.get('/dev/last-error', (req, res) => {
+    res.json(lastError || { message: 'No recent errors captured' });
+  });
+  
   // Test OpenAI connection
   app.get('/dev/test-openai', async (req, res) => {
     try {
