@@ -12,7 +12,9 @@ class ArnaldoMonthlyExpenses {
     try {
       console.log(`💰 ArnaldoMonthlyExpenses processing message from ${phoneNumber}: "${message}"`);
 
-      const response = await this.chat(phoneNumber, message);
+      // Get userId from phoneNumber
+      const userId = await this.getUserIdFromPhone(phoneNumber);
+      const response = await this.chat(userId, message);
       
       console.log(`💰 ArnaldoMonthlyExpenses response: "${response}"`);
       
@@ -23,10 +25,10 @@ class ArnaldoMonthlyExpenses {
     }
   }
 
-  async chat(phoneNumber, message) {
+  async chat(userId, message) {
     try {
       // Get complete conversation history
-      const history = await this.getConversationHistory(phoneNumber);
+      const history = await this.getConversationHistory(userId);
       
       // Build messages for ChatGPT with Arnaldo's expense discovery mission
       const messages = [
@@ -114,20 +116,66 @@ IMPORTANTE: Foque APENAS em descobrir e organizar os gastos mensais. Não dê co
     }
   }
 
-  async getConversationHistory(phoneNumber) {
+  async getConversationHistory(userId) {
     try {
-      // Get all messages for this user to provide full context
-      const messages = await Message.getConversationHistory(phoneNumber);
+      const db = require('../database/db');
       
-      // Convert to OpenAI format
-      return messages.map(msg => ({
-        role: msg.direction === 'inbound' ? 'user' : 'assistant',
-        content: msg.content
-      }));
+      // Get all messages for this user, ordered by time
+      const query = `
+        SELECT 
+          m.direction,
+          m.content,
+          m.created_at
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = $1
+        ORDER BY m.created_at ASC
+      `;
+      
+      const result = await db.query(query, [userId]);
+      
+      console.log(`📚 Loaded ${result.rows.length} historical messages for user ${userId}`);
+      
+      return result.rows.map(row => {
+        // Extract text content from JSON if needed
+        let content = row.content;
+        if (typeof content === 'string') {
+          try {
+            const parsed = JSON.parse(content);
+            content = parsed.text || parsed.body || content;
+          } catch (e) {
+            // If not JSON, use as-is
+          }
+        } else if (content?.text) {
+          content = content.text;
+        }
+        
+        return {
+          role: row.direction === 'inbound' ? 'user' : 'assistant',
+          content: content
+        };
+      });
       
     } catch (error) {
       console.error('❌ Error getting conversation history:', error);
       return [];
+    }
+  }
+
+  async getUserIdFromPhone(phoneNumber) {
+    try {
+      const db = require('../database/db');
+      const query = `SELECT id FROM users WHERE phone_number = $1`;
+      const result = await db.query(query, [phoneNumber]);
+      
+      if (result.rows.length === 0) {
+        throw new Error(`User not found for phone number: ${phoneNumber}`);
+      }
+      
+      return result.rows[0].id;
+    } catch (error) {
+      console.error('❌ Error getting user ID:', error);
+      throw error;
     }
   }
 }

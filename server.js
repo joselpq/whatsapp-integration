@@ -210,6 +210,31 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     const result = await DevTools.debugMessages(userId);
     res.json(result);
   });
+  
+  // Test OpenAI connection
+  app.get('/dev/test-openai', async (req, res) => {
+    try {
+      const ArnaldoGoalDiscovery = require('./src/services/ArnaldoGoalDiscovery');
+      const goalDiscovery = new ArnaldoGoalDiscovery();
+      
+      // Test basic OpenAI call
+      const result = await goalDiscovery.chat('test message', 'test-user-id');
+      
+      res.json({
+        success: true,
+        openaiKeyConfigured: !!process.env.OPENAI_API_KEY,
+        openaiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
+        result: result
+      });
+    } catch (error) {
+      res.json({
+        success: false,
+        error: error.message,
+        openaiKeyConfigured: !!process.env.OPENAI_API_KEY,
+        openaiKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0
+      });
+    }
+  });
 }
 
 // ============================================
