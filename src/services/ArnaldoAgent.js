@@ -51,13 +51,18 @@ class ArnaldoAgent {
       }
 
       // Get conversation state to check what phase we're in
+      console.log(`🔍 Step 1: Getting conversation state for user ${userId}`);
       const conversationState = await this._getConversationState(userId);
+      console.log(`🔍 Step 2: Conversation state:`, conversationState);
       
       // Phase 1: Goal Discovery
       if (!conversationState.goalComplete) {
         // Check if last message was goal confirmation question
+        console.log(`🔍 Step 3: Getting last outbound message for user ${userId}`);
         const lastMessage = await this._getLastOutboundMessage(userId);
+        console.log(`🔍 Step 4: Last message:`, lastMessage);
         const askedGoalConfirmation = lastMessage && lastMessage.includes('Podemos considerar este objetivo e seguir para a próxima etapa?');
+        console.log(`🔍 Step 5: Asked goal confirmation:`, askedGoalConfirmation);
         
         if (askedGoalConfirmation && this._isAffirmativeResponse(content)) {
           // User confirmed goal - transition to expenses
@@ -73,9 +78,11 @@ class ArnaldoAgent {
           };
         } else {
           // Still in goal discovery - route to AI
-          console.log(`🎯 Routing to Goal Discovery for user ${userId}`);
+          console.log(`🔍 Step 6: Routing to Goal Discovery for user ${userId}`);
           const goalResponse = await this.goalDiscovery.chat(content, userId);
+          console.log(`🔍 Step 7: Goal response:`, goalResponse);
           await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
+          console.log(`🔍 Step 8: Message sent successfully`);
           
           return {
             processed: true,
