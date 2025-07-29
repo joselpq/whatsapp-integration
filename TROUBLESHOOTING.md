@@ -2,6 +2,65 @@
 
 ## Common Issues & Solutions
 
+### 🚨 **CRITICAL FIX**: Conversation Flow Technical Error
+
+**Problem**: After welcome message, second message shows technical error fallback
+**Symptoms**: 
+- First message works fine (welcome message sent)
+- Second message triggers: "Ops! Tive um probleminha técnico. Pode repetir sua mensagem? 🤔"
+- Error: `lastMessage.includes is not a function`
+
+**Root Cause**: JSON parsing issue in `_getLastOutboundMessage()` method
+- Message content stored as JSON string in database: `'{"text":"Welcome message..."}'`
+- Code tries to call `.includes()` on JSON string instead of extracted text
+- Results in TypeError when checking for goal confirmation
+
+**Solution Applied**:
+```javascript
+// Fixed in ArnaldoAgent._getLastOutboundMessage()
+async _getLastOutboundMessage(userId) {
+  try {
+    const db = require('../database/db');
+    const query = `
+      SELECT m.content 
+      FROM messages m 
+      JOIN conversations c ON m.conversation_id = c.id 
+      WHERE c.user_id = $1 AND m.direction = 'outbound' 
+      ORDER BY m.created_at DESC 
+      LIMIT 1
+    `;
+    const result = await db.query(query, [userId]);
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    let content = result.rows[0].content;
+    
+    // Parse JSON content if needed (content is stored as JSON string)
+    if (typeof content === 'string') {
+      try {
+        const parsed = JSON.parse(content);
+        content = parsed.text || parsed.body || content;
+      } catch (e) {
+        // If not JSON, use as-is
+      }
+    } else if (content?.text) {
+      content = content.text;
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('Error getting last outbound message:', error);
+    return null;
+  }
+}
+```
+
+**Status**: ✅ **FIXED** - Conversation transitions now work properly
+
+---
+
 ### 1. User Reset Not Working
 
 **Problem**: AI remembers previous conversation context even after reset
