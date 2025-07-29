@@ -231,6 +231,41 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     res.json(lastError || { message: 'No recent errors captured' });
   });
   
+  // Test the exact flow that's failing
+  app.get('/dev/test-message-flow/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const message = req.query.message || 'Testando';
+      
+      // Simulate the exact messageInfo structure
+      const messageInfo = {
+        messageId: 'test-id',
+        userId: userId,
+        conversationId: 'test-conv-id',
+        phoneNumber: '+5511976196165',
+        content: message,
+        messageType: 'text'
+      };
+      
+      // Call ArnaldoAgent directly
+      const result = await arnaldoAgent.processIncomingMessage(messageInfo);
+      
+      res.json({
+        success: true,
+        result: result
+      });
+      
+    } catch (error) {
+      res.json({
+        success: false,
+        error: {
+          message: error.message,
+          stack: error.stack
+        }
+      });
+    }
+  });
+  
   // Test OpenAI connection
   app.get('/dev/test-openai', async (req, res) => {
     try {
