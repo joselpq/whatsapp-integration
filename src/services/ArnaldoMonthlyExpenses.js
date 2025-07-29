@@ -12,7 +12,7 @@ class ArnaldoMonthlyExpenses {
     try {
       console.log(`💰 ArnaldoMonthlyExpenses processing message from ${phoneNumber}: "${message}"`);
 
-      const response = await this.chat(message, phoneNumber);
+      const response = await this.chat(phoneNumber, message);
       
       console.log(`💰 ArnaldoMonthlyExpenses response: "${response}"`);
       
@@ -23,7 +23,7 @@ class ArnaldoMonthlyExpenses {
     }
   }
 
-  async chat(message, phoneNumber) {
+  async chat(phoneNumber, message) {
     try {
       // Get complete conversation history
       const history = await this.getConversationHistory(phoneNumber);
