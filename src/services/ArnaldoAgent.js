@@ -124,6 +124,13 @@ class ArnaldoAgent {
 
     } catch (error) {
       console.error('❌ Error processing message:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        userId: messageInfo?.userId,
+        phoneNumber: messageInfo?.phoneNumber,
+        content: messageInfo?.content
+      });
       
       // Try to send error message to user
       try {
