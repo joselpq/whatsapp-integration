@@ -295,7 +295,26 @@ Vamos começar: quanto você gasta por mês com moradia (aluguel, financiamento,
         LIMIT 1
       `;
       const result = await db.query(query, [userId]);
-      return result.rows.length > 0 ? result.rows[0].content : null;
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      let content = result.rows[0].content;
+      
+      // Parse JSON content if needed (content is stored as JSON string)
+      if (typeof content === 'string') {
+        try {
+          const parsed = JSON.parse(content);
+          content = parsed.text || parsed.body || content;
+        } catch (e) {
+          // If not JSON, use as-is
+        }
+      } else if (content?.text) {
+        content = content.text;
+      }
+      
+      return content;
     } catch (error) {
       console.error('Error getting last outbound message:', error);
       return null;
