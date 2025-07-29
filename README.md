@@ -4,12 +4,14 @@ WhatsApp Business API integration for ZenMind Financial Assistant - featuring Ar
 
 ## 🚀 Features
 
+- ✅ **ConversationOrchestrator Pattern** - Clean, extensible phase-based conversation architecture
 - ✅ **Intelligent Conversation Orchestration** - Seamless transitions between conversation phases
 - ✅ **Two-Phase AI Flow** - Goal Discovery → Monthly Expenses Discovery
 - ✅ **WhatsApp Webhook Integration** - Real-time message processing with 24/7 availability
 - ✅ **PostgreSQL Database** - Persistent conversation state and user data storage
 - ✅ **Specialized AI Agents** - Purpose-built OpenAI GPT-4o agents for each conversation phase
-- ✅ **Smart State Management** - Conversation-based phase detection and routing
+- ✅ **Smart State Management** - Centralized ConversationStateDetector for phase detection
+- ✅ **Modular Phase Components** - Each conversation phase is a separate, testable component
 - ✅ **24-Hour Conversation Window** - Automatic WhatsApp conversation limit handling
 - ✅ **Portuguese Language Support** - Native Brazilian Portuguese optimized prompts
 - ✅ **Development Tools** - Comprehensive debugging, testing, and reset utilities
@@ -31,10 +33,12 @@ Arnaldo guides users through a **two-phase intelligent conversation**:
 3. **Estimation Assistance** - AI helps users estimate costs when they don't know exact amounts
 4. **Final Summary** - Organized expenses list from highest to lowest: "Então essa é a estimativa dos seus custos mensais:"
 
-### Orchestration Engine
-- **Smart Routing** - Messages automatically routed to appropriate AI agent based on conversation state
-- **Context Preservation** - Full conversation history maintained across phases
-- **State Detection** - Intelligent phase detection based on conversation content analysis
+### Orchestration Architecture
+The system uses a **ConversationOrchestrator** pattern with:
+- **Phase-Based Routing** - Each conversation phase is a separate component
+- **ConversationStateDetector** - Centralized logic for detecting current conversation phase
+- **Extensible Design** - Easy to add new phases by implementing ConversationPhase interface
+- **Clean Separation** - Orchestration logic separated from phase implementation details
 
 ## 📋 Prerequisites
 
