@@ -217,8 +217,10 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
       const ArnaldoGoalDiscovery = require('./src/services/ArnaldoGoalDiscovery');
       const goalDiscovery = new ArnaldoGoalDiscovery();
       
-      // Test basic OpenAI call
-      const result = await goalDiscovery.chat('test message', 'test-user-id');
+      // Test with real user ID to check conversation history
+      const userId = req.query.userId || 'test-user-id';
+      const message = req.query.message || 'test message';
+      const result = await goalDiscovery.chat(message, userId);
       
       res.json({
         success: true,
