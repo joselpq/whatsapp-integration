@@ -1,19 +1,40 @@
 # WhatsApp Integration Service
 
-WhatsApp Business API integration for ZenMind Financial Assistant - featuring Arnaldo, an AI consultant focused exclusively on financial goal discovery.
+WhatsApp Business API integration for ZenMind Financial Assistant - featuring Arnaldo, an AI financial consultant with **intelligent two-phase conversation orchestration**: Goal Discovery → Monthly Expenses Discovery.
 
 ## 🚀 Features
 
-- ✅ **WhatsApp Webhook Integration** - Receives and processes messages in real-time
-- ✅ **PostgreSQL Database** - Persistent storage for users, conversations, and messages
-- ✅ **Single-Mission AI (Arnaldo)** - Focused exclusively on financial goal discovery
-- ✅ **Goal Discovery Process** - What, when, and how much do you want to achieve?
-- ✅ **Clean Architecture** - Simplified services with clear separation of concerns
-- ✅ **24-Hour Conversation Window** - Automatic tracking and management
-- ✅ **Portuguese Language Support** - Native Brazilian Portuguese conversation
-- ✅ **Development Tools** - Reset utilities and debugging endpoints
-- ✅ **Security** - Request signature verification
-- ✅ **Health Monitoring** - Database and service health checks
+- ✅ **Intelligent Conversation Orchestration** - Seamless transitions between conversation phases
+- ✅ **Two-Phase AI Flow** - Goal Discovery → Monthly Expenses Discovery
+- ✅ **WhatsApp Webhook Integration** - Real-time message processing with 24/7 availability
+- ✅ **PostgreSQL Database** - Persistent conversation state and user data storage
+- ✅ **Specialized AI Agents** - Purpose-built OpenAI GPT-4o agents for each conversation phase
+- ✅ **Smart State Management** - Conversation-based phase detection and routing
+- ✅ **24-Hour Conversation Window** - Automatic WhatsApp conversation limit handling
+- ✅ **Portuguese Language Support** - Native Brazilian Portuguese optimized prompts
+- ✅ **Development Tools** - Comprehensive debugging, testing, and reset utilities
+- ✅ **Production Ready** - Security, monitoring, and error handling built-in
+
+## 💬 Conversation Flow
+
+Arnaldo guides users through a **two-phase intelligent conversation**:
+
+### Phase 1: Welcome & Goal Discovery
+1. **Welcome Message** - Friendly introduction and goal discovery prompt
+2. **Goal Exploration** - AI helps users define their financial objective (what, when, how much)
+3. **Goal Confirmation** - "Podemos considerar este objetivo e seguir para a próxima etapa?"
+4. **Transition** - Automatic transition to expenses phase upon user confirmation
+
+### Phase 2: Monthly Expenses Discovery  
+1. **Transition Message** - Introduction to expenses discovery phase
+2. **Category Exploration** - Systematic discovery across expense categories (housing, food, transport, etc.)
+3. **Estimation Assistance** - AI helps users estimate costs when they don't know exact amounts
+4. **Final Summary** - Organized expenses list from highest to lowest: "Então essa é a estimativa dos seus custos mensais:"
+
+### Orchestration Engine
+- **Smart Routing** - Messages automatically routed to appropriate AI agent based on conversation state
+- **Context Preservation** - Full conversation history maintained across phases
+- **State Detection** - Intelligent phase detection based on conversation content analysis
 
 ## 📋 Prerequisites
 

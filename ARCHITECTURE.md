@@ -1,13 +1,13 @@
 # WhatsApp Financial Assistant Architecture
 
 ## Overview
-Our architecture follows a simplified, focused design with clear separation of concerns. The system has been refactored from a complex multi-agent system to a single-mission AI focused solely on financial goal discovery.
+Our architecture follows a simplified, focused design with clear separation of concerns. The system implements a **two-phase conversation orchestration** with seamless transitions between specialized AI agents: Goal Discovery → Monthly Expenses Discovery.
 
 ## Core Principles
-1. **Single Mission**: Arnaldo has one clear goal - discover what users want financially, when they want it, and how much it costs
+1. **Orchestrated Conversations**: Two-phase flow with intelligent transitions between specialized agents
 2. **Clean Separation**: Messaging infrastructure is completely separate from business logic
-3. **Simplicity First**: Reduced complexity for better reliability and maintainability
-4. **Context Preservation**: Full conversation history is passed to AI for better understanding
+3. **Context Preservation**: Full conversation history is passed to AI agents for better understanding
+4. **State-Based Routing**: Simple but robust conversation state management for seamless transitions
 
 ## Service Architecture
 
@@ -26,25 +26,69 @@ Our architecture follows a simplified, focused design with clear separation of c
 - Temporal context awareness (current date: July 2025)
 - Full conversation history for context
 - Portuguese-language optimized prompts
+- **Goal Confirmation**: Asks "Podemos considerar este objetivo e seguir para a próxima etapa?" when goal is clear
 
-### ArnaldoAgent.js
-**Mission**: Business logic orchestrator for conversation flow
+### ArnaldoMonthlyExpenses.js
+**Mission**: AI service focused on discovering and organizing user's monthly expenses
 
 **Responsibilities:**
-- Detect first-time users and send welcome message
-- Orchestrate AI responses through ArnaldoGoalDiscovery
-- Handle conversation state and user interactions
-- Manage business rules (no messages after goal completion)
+- Discover ALL monthly expenses across major categories (housing, food, transport, etc.)
+- Help users estimate costs when they don't know exact amounts
+- Organize expenses from highest to lowest
+- Provide final expenses summary when complete
 
-**Key Logic:**
+**Key Features:**
+- Uses OpenAI GPT-4o with temperature 0.3, max_tokens 300 (more focused responses)
+- Category-based expense discovery (housing, food, transport, health, education, etc.)
+- Estimation assistance for users with low financial literacy
+- **Completion Signal**: Says "Então essa é a estimativa dos seus custos mensais:" when done
+
+### ArnaldoAgent.js
+**Mission**: **Conversation Orchestration Engine** - Core routing and state management
+
+**Responsibilities:**
+- **Phase Detection**: Determine current conversation phase (Welcome → Goal Discovery → Monthly Expenses)
+- **Intelligent Routing**: Route messages to appropriate specialized AI agents
+- **State Transitions**: Manage seamless transitions between conversation phases
+- **Welcome Flow**: Detect first-time users and send onboarding message
+- **Conversation Windows**: Handle 24-hour WhatsApp conversation limits
+
+**Core Orchestration Logic:**
 ```javascript
-// Welcome message for new users
-if (outboundCount === 0) {
+// Phase 1: Welcome (First Message Detection)
+if (await this._isFirstMessage(userId)) {
   await this._sendWelcomeMessage(phoneNumber);
+  return;
 }
 
-// Process through AI for goal discovery
-const aiResponse = await this.arnaldoAI.processMessage(phoneNumber, message);
+// Phase 2: Goal Discovery
+if (!conversationState.goalComplete) {
+  // Check for goal confirmation from user
+  if (askedGoalConfirmation && this._isAffirmativeResponse(content)) {
+    await this._sendTransitionMessage(phoneNumber); // Transition to Phase 3
+    await this._markGoalComplete(userId);
+  } else {
+    // Continue goal discovery
+    const goalResponse = await this.goalDiscovery.chat(content, userId);
+    await this.messagingService.sendMessage(phoneNumber, goalResponse.message);
+  }
+}
+
+// Phase 3: Monthly Expenses Discovery
+else if (!conversationState.expensesComplete) {
+  const expenseResponse = await this.monthlyExpenses.processMessage(phoneNumber, content);
+  await this.messagingService.sendMessage(phoneNumber, expenseResponse.response);
+  
+  if (expenseResponse.expensesComplete) {
+    await this._markExpensesComplete(userId);
+  }
+}
+
+// Phase 4: Conversation Complete
+else {
+  // No further responses - conversation finished
+  return { processed: false, reason: 'conversation_complete' };
+}
 ```
 
 ### WhatsAppMessagingService.js
@@ -64,55 +108,87 @@ async storeIncomingMessage(messageInfo)
 async updateMessageStatus(messageId, status)
 ```
 
-## Message Flow Architecture
+## Message Flow Architecture - Two-Phase Orchestration
 
 ```
-             Incoming WhatsApp Message
-                       ↓
-              [WhatsApp Webhook]
-                    server.js
-                       ↓
-           WhatsAppMessagingService.storeIncomingMessage()
-                       ↓
-              ArnaldoAgent.processIncomingMessage()
-                       ↓
-               [Check if first message]
-                  /              \
-             Yes /                \ No
-                /                  \
-    Send Welcome Message     ArnaldoGoalDiscovery.processMessage()
-           ↓                           ↓
-    WhatsAppMessagingService     [Full conversation context]
-       .sendMessage()                   ↓
-                                 [OpenAI GPT-4o]
-                                 Goal Discovery AI
+                    Incoming WhatsApp Message
+                              ↓
+                     [WhatsApp Webhook] server.js
+                              ↓
+              WhatsAppMessagingService.storeIncomingMessage()
+                              ↓
+                 ArnaldoAgent.processIncomingMessage()
+                              ↓
+                    [ORCHESTRATION ENGINE]
+                              ↓
+               ┌──────────────────────────────────────┐
+               │         Phase Detection              │
+               │  1. Check if first message           │
+               │  2. Get conversation state           │
+               │  3. Determine current phase          │
+               └──────────────┬───────────────────────┘
+                              ↓
+                 ┌─────────────────────────────┐
+                 │  PHASE 1: Welcome Message   │
+                 │  if (isFirstMessage)        │
+                 │    → Send Welcome           │
+                 └─────────────┬───────────────┘
+                              ↓
+                 ┌─────────────────────────────┐
+                 │  PHASE 2: Goal Discovery    │
+                 │  if (!goalComplete)         │
+                 │    → Route to GoalAI        │ → OpenAI GPT-4o
+                 │    → Check for confirmation │   Goal Discovery
+                 │    → Send transition msg    │      ↓
+                 └─────────────┬───────────────┘   AI Response
+                              ↓                      ↓
+                 ┌─────────────────────────────┐      ↓
+                 │ PHASE 3: Monthly Expenses   │      ↓
+                 │ if (!expensesComplete)      │      ↓
+                 │   → Route to ExpensesAI     │ → OpenAI GPT-4o
+                 │   → Check for completion    │   Expenses Discovery
+                 └─────────────┬───────────────┘      ↓
+                              ↓                   AI Response
+                 ┌─────────────────────────────┐      ↓
+                 │  PHASE 4: Complete          │      ↓
+                 │  → No more responses        │      ↓
+                 └─────────────────────────────┘      ↓
+                                                     ↓
+                              WhatsAppMessagingService.sendMessage()
                                         ↓
-                                   AI Response
-                                        ↓
-                             WhatsAppMessagingService
-                                .sendMessage()
+                                 User receives response
 ```
 
 ## Conversation State Management
 
-**Simplified State Model:**
-The system uses minimal state tracking focused on message counting and conversation windows rather than complex state machines.
+**Phase-Based State Model:**
+The system uses intelligent state detection based on conversation content analysis and message patterns.
 
 ```javascript
-// Primary state indicators
-const isFirstMessage = (outboundMessageCount === 0);
-const conversationActive = (within24HourWindow);
+// State Detection Logic
+const conversationState = {
+  goalComplete: checkForTransitionMessage(),     // "Perfeito! Agora vamos entender..."
+  expensesComplete: checkForExpensesSummary()    // "Então essa é a estimativa..."
+};
 
-// No complex state transitions - just:
-// 1. First message -> Welcome
-// 2. Subsequent messages -> Goal Discovery AI
-// 3. Goal completion -> Stop responding
+// Phase Routing Logic
+if (isFirstMessage) → Phase 1: Welcome
+else if (!goalComplete) → Phase 2: Goal Discovery
+else if (!expensesComplete) → Phase 3: Monthly Expenses  
+else → Phase 4: Conversation Complete (no response)
 ```
 
-**Key State Data:**
-- `outbound_message_count`: Determines if welcome message needed
-- `conversation.updated_at`: Tracks 24-hour conversation window
-- `message_history`: Full context for AI processing
+**Key State Indicators:**
+- **First Message Detection**: `outbound_message_count === 0`
+- **Goal Completion**: Presence of transition message in conversation history
+- **Expenses Completion**: Presence of expenses summary message in conversation history
+- **Conversation Window**: 24-hour WhatsApp conversation limit tracking
+- **Full Context**: Complete message history passed to AI agents
+
+**Critical State Transition Points:**
+1. **Goal → Expenses Transition**: When user confirms goal with affirmative response
+2. **Expenses → Complete**: When AI provides final expenses summary
+3. **Window Expiry**: Conversation requires template messages after 24 hours
 
 ## Database Schema (Simplified)
 
@@ -270,23 +346,69 @@ Vou te ajudar a organizar suas finanças e realizar seus sonhos.
 Me conta: qual é seu MAIOR objetivo financeiro agora?
 ```
 
+## Orchestration Pattern Design
+
+The **ArnaldoAgent Orchestration Engine** implements a clean separation between conversation routing and AI processing:
+
+### Core Design Benefits
+1. **Centralized Control**: All conversation flow logic in one place  
+2. **Extensible**: Easy to add new conversation phases
+3. **Testable**: Each phase can be tested independently
+4. **Maintainable**: Clear separation of concerns between routing and AI
+
+### Potential Future Enhancement: ConversationOrchestrator Component
+
+```javascript
+class ConversationOrchestrator {
+  constructor() {
+    this.phases = new Map([
+      ['welcome', new WelcomePhase()],
+      ['goal_discovery', new GoalDiscoveryPhase()], 
+      ['monthly_expenses', new MonthlyExpensesPhase()],
+      ['complete', new CompletePhase()]
+    ]);
+  }
+  
+  async routeMessage(messageInfo) {
+    const currentPhase = await this.detectPhase(messageInfo.userId);
+    const phase = this.phases.get(currentPhase);
+    return await phase.process(messageInfo);
+  }
+  
+  async detectPhase(userId) {
+    // Phase detection logic extracted from ArnaldoAgent
+  }
+}
+```
+
+This would further encapsulate the orchestration logic and make it easier to add new conversation phases in the future.
+
 ## Troubleshooting Common Issues
+
+### Conversation Transition Errors
+**Problem**: Technical error fallback after second message
+**Root Cause**: JSON parsing issue in `_getLastOutboundMessage()`
+**Solution**: Message content stored as JSON but accessed as string
+```javascript
+// Fixed in _getLastOutboundMessage()
+let content = result.rows[0].content;
+if (typeof content === 'string') {
+  try {
+    const parsed = JSON.parse(content);
+    content = parsed.text || parsed.body || content;
+  } catch (e) { /* use as-is */ }
+}
+```
 
 ### Reset Not Working
 **Problem**: AI remembers previous conversation context
 **Root Cause**: Phone number format mismatch (+5511... vs 5511...)
 **Solution**: Use direct database reset with user ID
 
-```javascript
-// Emergency reset procedure
-const userId = await findUserIdDirectly();
-await DevTools.resetUserById(userId);
-```
-
-### Duplicate Users
-**Problem**: User created with different phone formats
-**Detection**: Multiple user records for same person
-**Solution**: Manual database cleanup + standardize phone format
+### Template Message Errors
+**Problem**: "Template name required for template messages"
+**Root Cause**: Conversation window expired (24-hour limit)
+**Solution**: User must send new message to reopen window
 
 ### Date Calculation Errors
 **Problem**: AI calculates dates incorrectly
@@ -294,11 +416,6 @@ await DevTools.resetUserById(userId);
 ```javascript
 CONTEXTO TEMPORAL: Estamos em julho de 2025. Use isso para calcular datas futuras corretamente.
 ```
-
-### No Welcome Message
-**Problem**: New users don't receive welcome message
-**Check**: Verify outbound message count is 0
-**Debug**: Use `/dev/messages/debug/:userId` endpoint
 
 ## Key Architecture Benefits
 
