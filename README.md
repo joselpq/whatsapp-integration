@@ -190,19 +190,30 @@ npm run db:verify
 ```
 
 ### Development Tools
+
+#### Reset User for Testing
+**IMPORTANT: Use the emergency reset endpoint for reliable user reset**
+
 ```bash
-# Reset user for testing
-POST /dev/reset/:phoneNumber
+# 1. First get the user ID
+curl "https://your-app.up.railway.app/dev/user-status/+5511999999999" | jq -r '.userId'
 
-# Debug user messages
-GET /dev/messages/debug/:userId
+# 2. Then use emergency reset with the user ID
+curl -X POST "https://your-app.up.railway.app/dev/emergency-reset" \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "USER_ID_HERE"}'
+```
 
-# Emergency reset by user ID (when phone format issues occur)
-POST /dev/reset-user/:userId
-
+#### Other Development Endpoints
+```bash
 # Check user status
-const DevTools = require('./src/utils/dev-tools');
-await DevTools.getUserStatus(phoneNumber);
+GET /dev/user-status/:phoneNumber
+
+# Debug user messages  
+GET /dev/debug-messages/:userId
+
+# List recent users
+GET /dev/users
 ```
 
 ### Manual Testing
@@ -210,6 +221,17 @@ await DevTools.getUserStatus(phoneNumber);
 2. Check Railway logs for webhook activity
 3. Receive auto-response from Arnaldo
 4. Check `/health` endpoint for statistics
+
+#### Resetting Test User
+To reset a user and start fresh:
+```bash
+# Example for test number +5511976196165
+curl -s "https://whatsapp-integration-production-06bb.up.railway.app/dev/user-status/+5511976196165" | jq -r '.userId'
+# Copy the userId from output, then:
+curl -X POST "https://whatsapp-integration-production-06bb.up.railway.app/dev/emergency-reset" \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "773f3dc0-e3e6-4d17-bde9-74c8666c9238"}'
+```
 
 ## 📊 Database Schema
 

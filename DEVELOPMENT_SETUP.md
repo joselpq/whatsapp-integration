@@ -136,14 +136,18 @@ src/services/
 #### Built-in Debugging Endpoints
 
 ```bash
-# Debug user messages and counts
-GET /dev/messages/debug/:userId
+# 🟢 EMERGENCY RESET - THE ONLY RELIABLE METHOD
+POST /dev/emergency-reset
+Body: {"userId": "xxx-xxx-xxx"}
+# Use this for all user resets!
 
-# Reset user by phone number
-POST /dev/reset/:phoneNumber
+# Get user status (to find userId for reset)
+GET /dev/user-status/:phoneNumber
+# Returns userId and statistics
 
-# Emergency reset by user ID (most reliable)
-POST /dev/reset-user/:userId
+# Debug user messages
+GET /dev/debug-messages/:userId
+# Shows message counts and samples
 ```
 
 #### DevTools Class Usage
@@ -200,9 +204,15 @@ await client.end();
 
 #### Manual Testing Flow
 
-1. **Reset test user**:
+1. **Reset test user (USE EMERGENCY RESET)**:
 ```bash
-curl -X POST http://localhost:3000/dev/reset/+5511976196165
+# Step 1: Get user ID
+curl http://localhost:3000/dev/user-status/+5511976196165 | jq -r '.userId'
+
+# Step 2: Emergency reset
+curl -X POST http://localhost:3000/dev/emergency-reset \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "xxx-xxx-xxx"}'
 ```
 
 2. **Send test message** via WhatsApp to +5511939041011
@@ -241,9 +251,9 @@ npm run test-send
 - Always normalize format or use user ID for operations
 
 #### Reset Not Working
-- Use emergency reset by user ID: `POST /dev/reset-user/:userId`
-- Check for duplicate users with different phone formats
-- Verify outbound message count is actually 0
+- Use emergency reset ONLY: `POST /dev/emergency-reset` with `{"userId": "xxx"}`
+- DO NOT use phone-based reset endpoints (they have format issues)
+- Emergency reset bypasses all phone format problems
 
 #### AI Memory Issues
 - AI gets full conversation history for context

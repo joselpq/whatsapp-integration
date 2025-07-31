@@ -61,34 +61,36 @@ async _getLastOutboundMessage(userId) {
 
 ---
 
-### 1. User Reset Not Working
+### 1. User Reset - Use Emergency Reset Only
 
-**Problem**: AI remembers previous conversation context even after reset
+**Problem**: Regular reset endpoints often fail due to phone number format issues
 **Symptoms**: 
-- User expects fresh start but AI references old conversation
-- Welcome message not sent to "new" user
-- Reset endpoints return success but behavior unchanged
+- Reset returns success but user data remains
+- AI remembers previous conversation context
+- Phone format mismatches (+55 vs 55)
 
-**Root Cause**: Phone number format mismatch between stored and lookup formats
-- Database may have `+5511976196165` 
-- Lookup may use `5511976196165`
-- Results in new user creation instead of reset
+**✅ SOLUTION: Use Emergency Reset (The Only Reliable Method)**
+```bash
+# Step 1: Get user ID
+curl "https://your-app.up.railway.app/dev/user-status/+5511999999999"
+# Returns: {"userId": "xxx-xxx-xxx", ...}
 
-**Solution**:
-```javascript
-// Use emergency reset by user ID (bypasses phone number issues)
-const DevTools = require('./src/utils/dev-tools');
-
-// 1. Find user ID directly
-const userStatus = await DevTools.getUserStatus(phoneNumber);
-console.log('User ID:', userStatus.userId);
-
-// 2. Reset using user ID
-const result = await DevTools.resetUserById(userStatus.userId);
-console.log('Reset result:', result);
+# Step 2: Emergency reset with user ID
+curl -X POST "https://your-app.up.railway.app/dev/emergency-reset" \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "xxx-xxx-xxx"}'
 ```
 
-**Prevention**: Standardize phone number format in all API calls
+**Why Emergency Reset Works:**
+- Bypasses phone number format issues completely
+- Uses user ID directly (no format ambiguity)
+- Properly deletes ALL related records
+- Resets created_at for fresh user experience
+
+**⚠️ DO NOT USE THESE (Unreliable):**
+- ~~POST /dev/reset/:phoneNumber~~ - Phone format issues
+- ~~POST /dev/reset-user~~ with phoneNumber in body - Same issues
+- ~~DevTools.resetUser(phoneNumber)~~ - Internally has format problems
 
 ### 2. Duplicate User Records
 
@@ -210,14 +212,22 @@ await client.end();
 ### Development Endpoints
 
 ```bash
-# Debug user messages and counts
-GET /dev/messages/debug/:userId
+# 🟢 RECOMMENDED: Emergency Reset
+POST /dev/emergency-reset
+Body: {"userId": "xxx-xxx-xxx"}
+# The ONLY reliable reset method - use this!
 
-# Reset user by phone number
-POST /dev/reset/:phoneNumber
+# Get User Information
+GET /dev/user-status/:phoneNumber
+# Returns userId needed for emergency reset
 
-# Emergency reset by user ID (most reliable)
-POST /dev/reset-user/:userId
+# Debug Messages
+GET /dev/debug-messages/:userId
+# Check message counts and history
+
+# List Recent Users
+GET /dev/users
+# See recent activity
 ```
 
 ### Using DevTools Class
@@ -225,21 +235,20 @@ POST /dev/reset-user/:userId
 ```javascript
 const DevTools = require('./src/utils/dev-tools');
 
-// Get user overview
+// ✅ CORRECT: Get user status (to find userId)
 const status = await DevTools.getUserStatus('+5511976196165');
-console.log('User status:', status);
+console.log('User ID:', status.userId); // Use this for reset!
 
-// Debug message counts
-const debug = await DevTools.debugMessages(userId);
-console.log('Debug info:', debug);
-
-// Emergency reset
-const reset = await DevTools.resetUserById(userId);
+// ✅ CORRECT: Emergency reset by ID
+const reset = await DevTools.resetUserById(status.userId);
 console.log('Reset result:', reset);
 
-// List recent users
+// ❌ AVOID: Phone-based reset (unreliable)
+// const reset = await DevTools.resetUser(phoneNumber); // DON'T USE
+
+// Other useful methods:
+const debug = await DevTools.debugMessages(userId);
 const users = await DevTools.listRecentUsers(10);
-console.log('Recent users:', users);
 ```
 
 ## Production Debugging

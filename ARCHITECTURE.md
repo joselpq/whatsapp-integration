@@ -261,17 +261,18 @@ console.log(`✅ Message sent successfully`);
 
 ### 2. Development Endpoints
 ```javascript
-// Message debugging
-GET /dev/messages/debug/:userId
+// User Reset - USE EMERGENCY RESET ONLY
+POST /dev/emergency-reset
+Body: {"userId": "xxx-xxx-xxx"}
+// The ONLY reliable reset method
+
+// Get User Status (to find userId for reset)
+GET /dev/user-status/:phoneNumber
+// Returns userId and user statistics
+
+// Message Debugging
+GET /dev/debug-messages/:userId
 // Returns message count and sample messages
-
-// User reset (for testing)
-POST /dev/reset/:phoneNumber
-// Clears all user data for fresh testing
-
-// Emergency reset by user ID
-POST /dev/reset-user/:userId
-// Direct database reset using user ID
 ```
 
 ### 3. Database Direct Access
