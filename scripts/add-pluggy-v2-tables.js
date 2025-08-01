@@ -57,9 +57,7 @@ async function addPluggyV2Tables() {
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW(),
           
-          UNIQUE(user_id, pluggy_item_id),
-          INDEX(client_user_id),
-          INDEX(status)
+          UNIQUE(user_id, pluggy_item_id)
         )
       `);
       console.log('✅ Created pluggy_v2_items table');
@@ -87,10 +85,7 @@ async function addPluggyV2Tables() {
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW(),
           
-          UNIQUE(user_id, pluggy_account_id),
-          INDEX(client_user_id),
-          INDEX(type),
-          INDEX(pluggy_item_id)
+          UNIQUE(user_id, pluggy_account_id)
         )
       `);
       console.log('✅ Created pluggy_v2_accounts table');
@@ -118,12 +113,7 @@ async function addPluggyV2Tables() {
           connector_name VARCHAR(255),
           created_at TIMESTAMP DEFAULT NOW(),
           
-          UNIQUE(user_id, pluggy_transaction_id),
-          INDEX(client_user_id),
-          INDEX(transaction_date DESC),
-          INDEX(category),
-          INDEX(amount),
-          INDEX(pluggy_account_id)
+          UNIQUE(user_id, pluggy_transaction_id)
         )
       `);
       console.log('✅ Created pluggy_v2_transactions table');
@@ -142,11 +132,7 @@ async function addPluggyV2Tables() {
           error_message TEXT,
           sync_duration_ms INTEGER,
           started_at TIMESTAMP DEFAULT NOW(),
-          completed_at TIMESTAMP,
-          
-          INDEX(client_user_id),
-          INDEX(sync_status),
-          INDEX(started_at DESC)
+          completed_at TIMESTAMP
         )
       `);
       console.log('✅ Created pluggy_v2_sync_log table');
@@ -162,15 +148,46 @@ async function addPluggyV2Tables() {
           processed BOOLEAN DEFAULT FALSE,
           processed_at TIMESTAMP,
           error_message TEXT,
-          created_at TIMESTAMP DEFAULT NOW(),
-          
-          INDEX(event_type),
-          INDEX(client_user_id),
-          INDEX(processed),
-          INDEX(created_at DESC)
+          created_at TIMESTAMP DEFAULT NOW()
         )
       `);
       console.log('✅ Created pluggy_v2_webhooks table');
+      
+      // Create indexes for better performance
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_items_client_user_id ON pluggy_v2_items(client_user_id)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_items_status ON pluggy_v2_items(status)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_accounts_client_user_id ON pluggy_v2_accounts(client_user_id)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_accounts_type ON pluggy_v2_accounts(type)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_transactions_client_user_id ON pluggy_v2_transactions(client_user_id)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_transactions_date ON pluggy_v2_transactions(transaction_date DESC)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_transactions_category ON pluggy_v2_transactions(category)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_sync_log_client_user_id ON pluggy_v2_sync_log(client_user_id)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_sync_log_status ON pluggy_v2_sync_log(sync_status)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_webhooks_event_type ON pluggy_v2_webhooks(event_type)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_pluggy_v2_webhooks_processed ON pluggy_v2_webhooks(processed)
+      `);
+      console.log('✅ Created performance indexes');
       
       // Update existing users table to ensure UUID support
       await client.query(`
