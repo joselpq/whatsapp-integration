@@ -29,6 +29,10 @@ class PluggyService {
       const response = await axios.post(`${this.baseUrl}/auth`, {
         clientId: this.clientId,
         clientSecret: this.clientSecret
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       this.apiKey = response.data.accessToken;
@@ -39,8 +43,14 @@ class PluggyService {
       return this.apiKey;
       
     } catch (error) {
-      console.error('❌ Pluggy authentication failed:', error.response?.data || error.message);
-      throw new Error('Failed to authenticate with Pluggy API');
+      console.error('❌ Pluggy authentication failed:');
+      console.error('Status:', error.response?.status);
+      console.error('Response:', error.response?.data);
+      console.error('Message:', error.message);
+      console.error('Base URL:', this.baseUrl);
+      console.error('Client ID length:', this.clientId?.length);
+      console.error('Client Secret length:', this.clientSecret?.length);
+      throw new Error(`Failed to authenticate with Pluggy API: ${error.response?.data?.message || error.message}`);
     }
   }
 
