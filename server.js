@@ -37,6 +37,8 @@ const arnaldoAgent = new ArnaldoAgent();
 
 // Import API routes
 const pluggyRoutes = require('./src/api/pluggy');
+const pluggySimpleRoutes = require('./src/api/pluggy-simple');
+const pluggyV2Routes = require('./src/api/pluggy-v2');
 
 // ============================================
 // WEBHOOK ENDPOINTS
@@ -160,6 +162,8 @@ app.get('/health', async (req, res) => {
 
 // Pluggy API routes
 app.use('/api/v1/pluggy', pluggyRoutes);
+app.use('/api/pluggy-simple', pluggySimpleRoutes);
+app.use('/api/pluggy-v2', pluggyV2Routes);
 
 // ============================================
 // DEVELOPMENT ENDPOINTS (REMOVE IN PRODUCTION)

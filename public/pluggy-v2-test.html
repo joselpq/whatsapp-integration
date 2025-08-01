@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pluggy V2 - Teste de Integração Open Finance</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+        .step {
+            margin: 25px 0;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .step:hover {
+            border-color: #3498db;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.1);
+        }
+        .step h3 {
+            color: #27ae60;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .step-icon {
+            font-size: 1.2em;
+        }
+        button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            border-left: 4px solid #34495e;
+        }
+        .success {
+            background: #d5f4e6;
+            border-left-color: #27ae60;
+            color: #1e6b3e;
+        }
+        .error {
+            background: #fadbd8;
+            border-left-color: #e74c3c;
+            color: #c0392b;
+        }
+        .info {
+            background: #d6eaf8;
+            border-left-color: #3498db;
+            color: #2471a3;
+        }
+        input[type="text"] {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 250px;
+            margin-right: 15px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .pluggy-widget {
+            margin: 20px 0;
+            padding: 30px;
+            border: 3px dashed #3498db;
+            border-radius: 15px;
+            text-align: center;
+            background: #f8f9fa;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #27ae60; }
+        .status-error { background: #e74c3c; }
+        .status-pending { background: #f39c12; }
+        .header-badge {
+            background: #27ae60;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏦 Pluggy V2 - Integração Open Finance</h1>
+        <p class="subtitle">Teste completo da nova integração limpa baseada na documentação oficial<span class="header-badge">✨ V2</span></p>
+        
+        <div class="step">
+            <h3><span class="step-icon">🔧</span> 1. Teste de Conectividade</h3>
+            <p>Verificar se as credenciais estão funcionando e a conexão com a API está ok:</p>
+            <button onclick="testConnection()">Testar Conexão</button>
+            <div id="connectionResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="step">
+            <h3><span class="step-icon">🏪</span> 2. Listar Bancos Disponíveis</h3>
+            <p>Veja quais instituições financeiras estão disponíveis no Pluggy:</p>
+            <button onclick="listConnectors()">Listar Bancos</button>
+            <div id="connectorsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="step">
+            <h3><span class="step-icon">👤</span> 3. Configurar Usuário</h3>
+            <p>Digite o número de telefone para criar um token de conexão:</p>
+            <input type="text" id="phoneNumber" placeholder="+5511976196165" value="+5511976196165">
+            <button onclick="setupUser()">Criar Token</button>
+            <div id="userResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="step">
+            <h3><span class="step-icon">🔗</span> 4. Conectar Conta Bancária</h3>
+            <p>Use o widget do Pluggy para conectar uma conta bancária (sandbox para testes):</p>
+            <button id="connectBtn" onclick="connectAccount()" disabled>Conectar Conta</button>
+            <div class="pluggy-widget">
+                <div id="pluggy-connect"></div>
+                <p><em>O widget do Pluggy aparecerá aqui após criar o token de conexão</em></p>
+            </div>
+            <div id="connectResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="grid">
+            <div class="step">
+                <h3><span class="step-icon">📊</span> 5. Ver Dados Financeiros</h3>
+                <p>Visualize os dados coletados das contas conectadas:</p>
+                <button id="viewDataBtn" onclick="viewFinancialData()" disabled>Ver Dados</button>
+                <div id="dataResult" class="result" style="display: none;"></div>
+            </div>
+
+            <div class="step">
+                <h3><span class="step-icon">📈</span> 6. Resumo Financeiro</h3>
+                <p>Veja o resumo analítico dos seus dados:</p>
+                <button id="summaryBtn" onclick="getFinancialSummary()" disabled>Ver Resumo</button>
+                <div id="summaryResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pluggy Connect Widget -->
+    <script src="https://cdn.pluggy.ai/web/v3/pluggy-connect.js"></script>
+    
+    <script>
+        let currentUserId = null;
+        let connectToken = null;
+        
+        // Show result with proper styling
+        function showResult(element, text, type = 'info') {
+            element.style.display = 'block';
+            element.textContent = text;
+            element.className = `result ${type}`;
+        }
+        
+        // Test API connectivity
+        async function testConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            
+            try {
+                showResult(resultDiv, 'Testando conectividade com Pluggy V2...', 'info');
+                
+                const response = await fetch('/api/pluggy-v2/test');
+                const data = await response.json();
+                
+                if (data.success) {
+                    let result = `✅ CONECTIVIDADE OK!\n\n`;
+                    result += `🔑 Autenticação: Sucesso\n`;
+                    result += `📋 Total de bancos: ${data.data.totalConnectors}\n`;
+                    result += `🏦 Exemplos: ${data.data.sampleConnectors.map(c => c.name).join(', ')}\n`;
+                    result += `⏰ Testado em: ${new Date(data.timestamp).toLocaleString('pt-BR')}`;
+                    
+                    showResult(resultDiv, result, 'success');
+                } else {
+                    showResult(resultDiv, `❌ Erro na conectividade: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Erro de rede: ${error.message}`, 'error');
+            }
+        }
+
+        // List available connectors
+        async function listConnectors() {
+            const resultDiv = document.getElementById('connectorsResult');
+            
+            try {
+                showResult(resultDiv, 'Carregando bancos disponíveis...', 'info');
+                
+                const response = await fetch('/api/pluggy-v2/connectors');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const bancos = data.data.slice(0, 15); // Show first 15
+                    let result = `✅ ${data.count} bancos disponíveis:\n\n`;
+                    
+                    bancos.forEach(banco => {
+                        result += `🏦 ${banco.name}\n`;
+                        result += `   Tipo: ${banco.type} | País: ${banco.country}\n`;
+                        if (banco.isOpenFinance) result += `   🟢 Open Finance\n`;
+                        result += `\n`;
+                    });
+                    
+                    if (data.count > 15) {
+                        result += `... e mais ${data.count - 15} bancos`;
+                    }
+                    
+                    showResult(resultDiv, result, 'success');
+                } else {
+                    showResult(resultDiv, `❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Erro de conexão: ${error.message}`, 'error');
+            }
+        }
+
+        // Setup user and create connect token
+        async function setupUser() {
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const resultDiv = document.getElementById('userResult');
+            
+            if (!phoneNumber) {
+                showResult(resultDiv, 'Por favor, digite um número de telefone', 'error');
+                return;
+            }
+
+            try {
+                showResult(resultDiv, 'Criando token de conexão...', 'info');
+                
+                const response = await fetch('/api/pluggy-v2/connect-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        phoneNumber: phoneNumber,
+                        webhookUrl: `${window.location.origin}/api/pluggy-v2/webhook`,
+                        includeSandbox: true
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUserId = data.data.clientUserId;
+                    connectToken = data.data.connectToken;
+                    
+                    document.getElementById('connectBtn').disabled = false;
+                    
+                    let result = `✅ Token criado com sucesso!\n\n`;
+                    result += `👤 User ID: ${currentUserId}\n`;
+                    result += `🔗 Token expira em: ${new Date(data.data.expiresAt).toLocaleString('pt-BR')}\n`;
+                    result += `📡 Webhook: ${data.data.webhookUrl}`;
+                    
+                    showResult(resultDiv, result, 'success');
+                } else {
+                    showResult(resultDiv, `❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Erro de conexão: ${error.message}`, 'error');
+            }
+        }
+
+        // Connect bank account using Pluggy widget
+        function connectAccount() {
+            if (!connectToken) {
+                alert('Primeiro crie o token de conexão!');
+                return;
+            }
+
+            const resultDiv = document.getElementById('connectResult');
+            showResult(resultDiv, 'Iniciando widget de conexão...', 'info');
+
+            // Initialize Pluggy Connect Widget
+            const pluggyConnect = new PluggyConnect({
+                connectToken: connectToken,
+                includeSandbox: true,
+                onSuccess: function(itemData) {
+                    let result = `✅ Conta conectada com sucesso!\n\n`;
+                    result += `🔗 Item ID: ${itemData.itemId}\n`;
+                    result += `📊 Status: ${itemData.status}\n`;
+                    result += `🏦 Banco: ${itemData.connector?.name}\n`;
+                    result += `⏰ Conectado em: ${new Date().toLocaleString('pt-BR')}`;
+                    
+                    showResult(resultDiv, result, 'success');
+                    
+                    // Enable data viewing buttons
+                    document.getElementById('viewDataBtn').disabled = false;
+                    document.getElementById('summaryBtn').disabled = false;
+                    
+                    // Auto-fetch data after 3 seconds
+                    setTimeout(() => {
+                        console.log('Auto-fetching data...');
+                        viewFinancialData();
+                    }, 3000);
+                },
+                onError: function(error) {
+                    showResult(resultDiv, `❌ Erro na conexão: ${error.message}`, 'error');
+                }
+            });
+
+            // Mount the widget
+            pluggyConnect.init('pluggy-connect');
+        }
+
+        // View financial data
+        async function viewFinancialData() {
+            if (!currentUserId) {
+                alert('Primeiro configure o usuário e conecte uma conta!');
+                return;
+            }
+
+            const resultDiv = document.getElementById('dataResult');
+            
+            try {
+                showResult(resultDiv, 'Carregando dados financeiros...', 'info');
+                
+                const response = await fetch(`/api/pluggy-v2/user/${currentUserId}/financial-data`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { items, accounts, transactions, summary } = data.data;
+                    
+                    let result = `✅ DADOS FINANCEIROS CARREGADOS\n\n`;
+                    result += `📊 RESUMO:\n`;
+                    result += `• ${summary.totalItems} conexões (${summary.activeItems} ativas)\n`;
+                    result += `• ${summary.totalAccounts} contas\n`;
+                    result += `• ${summary.totalTransactions} transações\n\n`;
+                    
+                    if (accounts.length > 0) {
+                        result += `💳 CONTAS:\n`;
+                        accounts.slice(0, 5).forEach(account => {
+                            result += `• ${account.name} (${account.type})\n`;
+                            result += `  Saldo: R$ ${(account.balance || 0).toFixed(2)}\n`;
+                            result += `  Banco: ${account.connectorName}\n\n`;
+                        });
+                    }
+                    
+                    if (transactions.length > 0) {
+                        result += `💰 ÚLTIMAS TRANSAÇÕES:\n`;
+                        transactions.slice(0, 10).forEach(tx => {
+                            const valor = tx.amount >= 0 ? `+R$ ${tx.amount.toFixed(2)}` : `-R$ ${Math.abs(tx.amount).toFixed(2)}`;
+                            result += `• ${tx.description}\n`;
+                            result += `  ${valor} | ${new Date(tx.date).toLocaleDateString('pt-BR')}\n\n`;
+                        });
+                    }
+                    
+                    showResult(resultDiv, result, 'success');
+                } else {
+                    showResult(resultDiv, `❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Erro de conexão: ${error.message}`, 'error');
+            }
+        }
+
+        // Get financial summary
+        async function getFinancialSummary() {
+            if (!currentUserId) {
+                alert('Primeiro configure o usuário e conecte uma conta!');
+                return;
+            }
+
+            const resultDiv = document.getElementById('summaryResult');
+            
+            try {
+                showResult(resultDiv, 'Gerando resumo financeiro...', 'info');
+                
+                const response = await fetch(`/api/pluggy-v2/user/${currentUserId}/summary`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { summary } = data.data;
+                    
+                    let result = `📈 RESUMO FINANCEIRO (últimos 30 dias)\n\n`;
+                    
+                    // Account summary
+                    result += `💳 CONTAS POR TIPO:\n`;
+                    Object.entries(summary.accounts).forEach(([type, info]) => {
+                        result += `• ${type}: ${info.count} conta(s) | R$ ${info.totalBalance.toFixed(2)}\n`;
+                    });
+                    
+                    result += `\n💰 MOVIMENTAÇÃO:\n`;
+                    result += `• Receitas: R$ ${summary.transactions.income.total.toFixed(2)} (${summary.transactions.income.count} lançamentos)\n`;
+                    result += `• Despesas: R$ ${summary.transactions.expenses.total.toFixed(2)} (${summary.transactions.expenses.count} lançamentos)\n`;
+                    result += `• Saldo líquido: R$ ${summary.netFlow.toFixed(2)}\n`;
+                    
+                    result += `\n📊 CATEGORIAS PRINCIPAIS:\n`;
+                    const topCategories = Object.entries(summary.transactions.categories)
+                        .sort(([,a], [,b]) => b.amount - a.amount)
+                        .slice(0, 5);
+                    
+                    topCategories.forEach(([category, info]) => {
+                        result += `• ${category}: R$ ${info.amount.toFixed(2)} (${info.count}x)\n`;
+                    });
+                    
+                    result += `\n⏰ Gerado em: ${new Date(summary.generatedAt).toLocaleString('pt-BR')}`;
+                    
+                    showResult(resultDiv, result, 'success');
+                } else {
+                    showResult(resultDiv, `❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(resultDiv, `❌ Erro de conexão: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run connectivity test on page load
+        window.addEventListener('load', function() {
+            console.log('🏦 Pluggy V2 Test Interface Loaded');
+            setTimeout(testConnection, 1000);
+        });
+    </script>
+</body>
+</html>

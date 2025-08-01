@@ -35,7 +35,7 @@ class PluggyService {
         }
       });
 
-      this.apiKey = response.data.accessToken;
+      this.apiKey = response.data.apiKey;
       // API key expires in 2 hours
       this.apiKeyExpiry = new Date(Date.now() + 2 * 60 * 60 * 1000);
       
