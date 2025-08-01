@@ -31,9 +31,7 @@ class GoalDiscoveryPhase extends ConversationPhase {
         // User confirmed goal - transition to expenses phase
         console.log(`✅ User confirmed goal with "${content}", transitioning to expenses`);
         
-        const transitionMessage = `Perfeito! Agora vamos entender seus gastos mensais para criar um plano de economia eficiente. 📊
-
-Vamos começar: quanto você gasta por mês com moradia (aluguel, financiamento, condomínio)?`;
+        const transitionMessage = `Perfeito, agora vamos entender seus gastos mensais, começando por Moradia 📊. Quanto você gasta de aluguel ou financiamento?`;
 
         await this.messagingService.sendMessage(phoneNumber, transitionMessage);
         

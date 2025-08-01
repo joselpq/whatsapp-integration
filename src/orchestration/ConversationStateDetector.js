@@ -89,12 +89,10 @@ class ConversationStateDetector {
         JOIN conversations c ON m.conversation_id = c.id 
         WHERE c.user_id = $1 
         AND m.direction = 'outbound' 
-        AND ((m.content::text) LIKE '%Perfeito! Agora vamos entender seus gastos mensais%')
+        AND ((m.content::text) LIKE '%Perfeito, agora vamos entender seus gastos mensais%')
       `;
-      console.log(`🔍 Checking goal complete for user ${userId}`);
       const goalResult = await db.query(goalCompleteQuery, [userId]);
       const goalComplete = parseInt(goalResult.rows[0].count) > 0;
-      console.log(`🎯 Goal complete: ${goalComplete} (found ${goalResult.rows[0].count} messages)`);
       
       // Check if expenses discovery is complete
       const expensesCompleteQuery = `
@@ -105,28 +103,10 @@ class ConversationStateDetector {
         AND m.direction = 'outbound' 
         AND ((m.content::text) LIKE '%então essa é a estimativa dos seus custos mensais:%')
       `;
-      console.log(`💰 Checking expenses complete for user ${userId}`);
       const expensesResult = await db.query(expensesCompleteQuery, [userId]);
       const expensesComplete = parseInt(expensesResult.rows[0].count) > 0;
-      console.log(`💰 Expenses complete: ${expensesComplete} (found ${expensesResult.rows[0].count} messages)`);
       
-      console.log(`📊 User ${userId} final conversation state: goal=${goalComplete}, expenses=${expensesComplete}`);
-      
-      // Debug: Let's check the last few messages
-      const debugQuery = `
-        SELECT m.direction, m.content, m.created_at
-        FROM messages m
-        JOIN conversations c ON m.conversation_id = c.id
-        WHERE c.user_id = $1
-        ORDER BY m.created_at DESC
-        LIMIT 5
-      `;
-      const debugResult = await db.query(debugQuery, [userId]);
-      console.log(`📝 Last 5 messages for debugging:`);
-      debugResult.rows.forEach((row, i) => {
-        const content = typeof row.content === 'string' ? row.content.substring(0, 50) : JSON.stringify(row.content).substring(0, 50);
-        console.log(`  ${i+1}. ${row.direction}: ${content}...`);
-      });
+      console.log(`📊 User ${userId} conversation state: goal=${goalComplete}, expenses=${expensesComplete}`);
       
       return {
         goalComplete,
