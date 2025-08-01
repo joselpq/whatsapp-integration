@@ -292,6 +292,58 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
       });
     }
   });
+  
+  // Setup Pluggy database tables
+  app.post('/dev/setup-pluggy-tables', async (req, res) => {
+    try {
+      const addPluggyTables = require('./scripts/add-pluggy-tables');
+      console.log('🏗️ Setting up Pluggy tables...');
+      
+      await addPluggyTables();
+      
+      res.json({
+        success: true,
+        message: 'Pluggy tables created successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error setting up Pluggy tables:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+  
+  // Test Pluggy connection
+  app.get('/dev/test-pluggy', async (req, res) => {
+    try {
+      const PluggyService = require('./src/services/PluggyService');
+      const pluggyService = new PluggyService();
+      
+      // Test authentication
+      const apiKey = await pluggyService.authenticate();
+      
+      // Test getting connectors
+      const connectors = await pluggyService.getConnectors();
+      
+      res.json({
+        success: true,
+        message: 'Pluggy connection successful',
+        data: {
+          hasCredentials: !!(process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET),
+          clientIdLength: process.env.PLUGGY_CLIENT_ID ? process.env.PLUGGY_CLIENT_ID.length : 0,
+          connectorCount: connectors.length,
+          sampleConnectors: connectors.slice(0, 3).map(c => ({ id: c.id, name: c.name, type: c.type }))
+        }
+      });
+    } catch (error) {
+      res.json({
+        success: false,
+        error: error.message,
+        hasCredentials: !!(process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET)
+      });
+    }
+  });
 }
 
 // ============================================
