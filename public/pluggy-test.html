@@ -147,14 +147,14 @@
             try {
                 showResult(resultDiv, 'Configurando usuário...', 'info');
                 
-                const response = await fetch('/api/pluggy/connect-token', {
+                const response = await fetch('/api/v1/pluggy/connect-token', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         phoneNumber: phoneNumber,
-                        webhookUrl: `${window.location.origin}/api/pluggy/webhook`
+                        webhookUrl: `${window.location.origin}/api/v1/pluggy/webhook`
                     })
                 });
 
@@ -181,7 +181,7 @@
             try {
                 showResult(resultDiv, 'Carregando bancos disponíveis...', 'info');
                 
-                const response = await fetch('/api/pluggy/connectors');
+                const response = await fetch('/api/v1/pluggy/connectors');
                 const data = await response.json();
                 
                 if (data.success) {
@@ -235,7 +235,7 @@
             if (!currentUserId) return;
             
             try {
-                const response = await fetch(`/api/pluggy/user/${currentUserId}/sync`, {
+                const response = await fetch(`/api/v1/pluggy/user/${currentUserId}/sync`, {
                     method: 'POST'
                 });
                 
@@ -258,11 +258,11 @@
                 showResult(resultDiv, 'Carregando dados financeiros...', 'info');
                 
                 // Get accounts
-                const accountsResponse = await fetch(`/api/pluggy/user/${currentUserId}/accounts`);
+                const accountsResponse = await fetch(`/api/v1/pluggy/user/${currentUserId}/accounts`);
                 const accountsData = await accountsResponse.json();
                 
                 // Get recent transactions
-                const transactionsResponse = await fetch(`/api/pluggy/user/${currentUserId}/transactions?limit=10`);
+                const transactionsResponse = await fetch(`/api/v1/pluggy/user/${currentUserId}/transactions?limit=10`);
                 const transactionsData = await transactionsResponse.json();
                 
                 if (accountsData.success && transactionsData.success) {
@@ -305,7 +305,7 @@
             try {
                 showResult(resultDiv, 'Gerando resumo financeiro...', 'info');
                 
-                const response = await fetch(`/api/pluggy/user/${currentUserId}/summary`);
+                const response = await fetch(`/api/v1/pluggy/user/${currentUserId}/summary`);
                 const data = await response.json();
                 
                 if (data.success) {
