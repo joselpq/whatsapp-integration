@@ -89,8 +89,7 @@ class ConversationStateDetector {
         JOIN conversations c ON m.conversation_id = c.id 
         WHERE c.user_id = $1 
         AND m.direction = 'outbound' 
-        AND (m.content LIKE '%Perfeito! Agora vamos entender seus gastos mensais%'
-          OR m.content::jsonb->>'text' LIKE '%Perfeito! Agora vamos entender seus gastos mensais%')
+        AND ((m.content::text) LIKE '%Perfeito! Agora vamos entender seus gastos mensais%')
       `;
       console.log(`🔍 Checking goal complete for user ${userId}`);
       const goalResult = await db.query(goalCompleteQuery, [userId]);
@@ -104,8 +103,7 @@ class ConversationStateDetector {
         JOIN conversations c ON m.conversation_id = c.id 
         WHERE c.user_id = $1 
         AND m.direction = 'outbound' 
-        AND (m.content LIKE '%então essa é a estimativa dos seus custos mensais:%'
-          OR m.content::jsonb->>'text' LIKE '%então essa é a estimativa dos seus custos mensais:%')
+        AND ((m.content::text) LIKE '%então essa é a estimativa dos seus custos mensais:%')
       `;
       console.log(`💰 Checking expenses complete for user ${userId}`);
       const expensesResult = await db.query(expensesCompleteQuery, [userId]);
