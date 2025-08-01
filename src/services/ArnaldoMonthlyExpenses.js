@@ -10,13 +10,14 @@ class ArnaldoMonthlyExpenses {
 
   async processMessage(phoneNumber, message) {
     try {
-      console.log(`💰 ArnaldoMonthlyExpenses processing message from ${phoneNumber}: "${message}"`);
+      console.log(`🏴‍☠️🏴‍☠️🏴‍☠️ PIRATE MODE ACTIVATED - ArnaldoMonthlyExpenses processing message from ${phoneNumber}: "${message}"`);
+      console.log(`🏴‍☠️ THIS IS THE PIRATE VERSION - IF YOU SEE THIS, THE CODE IS RUNNING`);
 
       // Get userId from phoneNumber
       const userId = await this.getUserIdFromPhone(phoneNumber);
       const response = await this.chat(userId, message);
       
-      console.log(`💰 ArnaldoMonthlyExpenses response: "${response}"`);
+      console.log(`🏴‍☠️ PIRATE ArnaldoMonthlyExpenses response: "${response}"`);
       
       return response;
     } catch (error) {
@@ -43,7 +44,8 @@ class ArnaldoMonthlyExpenses {
         }
       ];
 
-      console.log(`💰 Arnaldo Expenses processing message with ${history.length} messages of history`);
+      console.log(`🏴‍☠️🏴‍☠️🏴‍☠️ PIRATE Arnaldo Expenses processing message with ${history.length} messages of history`);
+      console.log(`🏴‍☠️ USING PIRATE PROMPT - THIS SHOULD PRODUCE GIBBERISH`);
 
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4o',
