@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pluggy Widget Debug</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .warning { background: #fff3cd; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Pluggy Widget Diagnostic</h1>
+    
+    <div id="results"></div>
+    
+    <h2>Manual Test</h2>
+    <button onclick="testWidget()">Test Widget Loading</button>
+    <div id="widget-test"></div>
+
+    <!-- Pluggy Connect Widget -->
+    <script src="https://cdn.pluggy.ai/web/v3/pluggy-connect.js"></script>
+    
+    <script>
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.textContent = message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        // Run diagnostics
+        function runDiagnostics() {
+            addResult('🚀 Starting diagnostics...');
+            
+            // Test 1: Script availability
+            if (typeof PluggyConnect !== 'undefined') {
+                addResult('✅ PluggyConnect script loaded successfully', 'success');
+            } else {
+                addResult('❌ PluggyConnect script not available', 'error');
+                return;
+            }
+            
+            // Test 2: Try to create instance
+            try {
+                const testConnect = new PluggyConnect({
+                    connectToken: 'test-token',
+                    onError: () => {}
+                });
+                addResult('✅ PluggyConnect instance created', 'success');
+            } catch (error) {
+                addResult(`❌ Error creating PluggyConnect: ${error.message}`, 'error');
+            }
+            
+            // Test 3: Network connectivity
+            fetch('https://api.pluggy.ai/connectors', { mode: 'no-cors' })
+                .then(() => addResult('✅ Can reach Pluggy API', 'success'))
+                .catch(() => addResult('⚠️ Cannot reach Pluggy API (CORS expected)', 'warning'));
+        }
+        
+        async function testWidget() {
+            const resultDiv = document.getElementById('widget-test');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Get a real connect token first
+                const response = await fetch('/api/pluggy-v2/connect-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber: '+5511976196165' })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    resultDiv.innerHTML = `❌ Failed to get connect token: ${data.error}`;
+                    return;
+                }
+                
+                const connectToken = data.data.connectToken;
+                resultDiv.innerHTML = '✅ Got connect token, initializing widget...';
+                
+                const pluggyConnect = new PluggyConnect({
+                    connectToken: connectToken,
+                    includeSandbox: true,
+                    onSuccess: (itemData) => {
+                        resultDiv.innerHTML = `✅ Success: ${JSON.stringify(itemData)}`;
+                    },
+                    onError: (error) => {
+                        resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                    },
+                    onEvent: (eventName, data) => {
+                        console.log('Event:', eventName, data);
+                        if (eventName === 'OPEN') {
+                            resultDiv.innerHTML = '🔄 Widget opened successfully!';
+                        }
+                    }
+                });
+                
+                // Create container and mount
+                const container = document.createElement('div');
+                container.id = 'test-widget';
+                container.style.minHeight = '300px';
+                container.style.border = '2px solid #007bff';
+                container.style.borderRadius = '8px';
+                container.style.margin = '10px 0';
+                
+                resultDiv.appendChild(container);
+                
+                pluggyConnect.init('test-widget');
+                
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Exception: ${error.message}`;
+            }
+        }
+
+        // Run on load
+        window.addEventListener('load', runDiagnostics);
+    </script>
+</body>
+</html>
