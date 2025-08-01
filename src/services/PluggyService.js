@@ -71,7 +71,7 @@ class PluggyService {
 
       const response = await axios.post(`${this.baseUrl}/connect_token`, requestData, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'X-API-KEY': apiKey,
           'Content-Type': 'application/json'
         }
       });
@@ -97,7 +97,7 @@ class PluggyService {
       
       const response = await axios.get(`${this.baseUrl}/connectors`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`
+          'X-API-KEY': apiKey
         }
       });
 
@@ -127,7 +127,7 @@ class PluggyService {
       
       const response = await axios.get(`${this.baseUrl}/items`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`
+          'X-API-KEY': apiKey
         },
         params: {
           'clientUserId': userId
@@ -159,7 +159,7 @@ class PluggyService {
       
       const response = await axios.get(`${this.baseUrl}/accounts`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`
+          'X-API-KEY': apiKey
         },
         params: {
           itemId: itemId
@@ -205,7 +205,7 @@ class PluggyService {
 
       const response = await axios.get(`${this.baseUrl}/transactions`, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`
+          'X-API-KEY': apiKey
         },
         params: params
       });
