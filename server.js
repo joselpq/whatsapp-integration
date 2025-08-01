@@ -318,6 +318,27 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEV_TOOLS_ENABLED === '
     }
   });
   
+  // Setup Pluggy V2 database tables
+  app.post('/dev/setup-pluggy-v2-tables', async (req, res) => {
+    try {
+      const addPluggyV2Tables = require('./scripts/add-pluggy-v2-tables');
+      console.log('🏗️ Setting up Pluggy V2 tables...');
+      
+      await addPluggyV2Tables();
+      
+      res.json({
+        success: true,
+        message: 'Pluggy V2 tables created successfully'
+      });
+    } catch (error) {
+      console.error('❌ Error setting up Pluggy V2 tables:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+  
   // Test Pluggy connection
   app.get('/dev/test-pluggy', async (req, res) => {
     try {

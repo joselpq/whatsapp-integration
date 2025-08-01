@@ -18,7 +18,8 @@
     "test:supervisor": "node tests/supervisor-test.js",
     "test:state": "node tests/test-state-persistence.js",
     "test:all": "npm test && npm run test:performance && npm run test:goal-wizard && npm run test:supervisor",
-    "pluggy:setup": "node scripts/add-pluggy-tables.js"
+    "pluggy:setup": "node scripts/add-pluggy-tables.js",
+    "pluggy:v2:setup": "node scripts/add-pluggy-v2-tables.js"
   },
   "keywords": [
     "whatsapp",
