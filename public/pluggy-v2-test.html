@@ -211,7 +211,9 @@
     </div>
 
     <!-- Pluggy Connect Widget -->
-    <script src="https://cdn.pluggy.ai/web/v3/pluggy-connect.js"></script>
+    <script src="https://cdn.pluggy.ai/web/v3/pluggy-connect.js" 
+            onerror="console.error('❌ Failed to load Pluggy Connect script'); window.pluggyScriptError = true;">
+    </script>
     
     <script>
         let currentUserId = null;
@@ -341,36 +343,85 @@
             const resultDiv = document.getElementById('connectResult');
             showResult(resultDiv, 'Iniciando widget de conexão...', 'info');
 
-            // Initialize Pluggy Connect Widget
-            const pluggyConnect = new PluggyConnect({
-                connectToken: connectToken,
-                includeSandbox: true,
-                onSuccess: function(itemData) {
-                    let result = `✅ Conta conectada com sucesso!\n\n`;
-                    result += `🔗 Item ID: ${itemData.itemId}\n`;
-                    result += `📊 Status: ${itemData.status}\n`;
-                    result += `🏦 Banco: ${itemData.connector?.name}\n`;
-                    result += `⏰ Conectado em: ${new Date().toLocaleString('pt-BR')}`;
+            try {
+                // Check if PluggyConnect is available
+                if (typeof PluggyConnect === 'undefined') {
+                    let errorMsg = '❌ Erro: Widget do Pluggy não carregou.\n\n';
+                    errorMsg += 'Possíveis causas:\n';
+                    errorMsg += '• Bloqueador de anúncios ativo\n';
+                    errorMsg += '• Problemas de conectividade\n';
+                    errorMsg += '• Firewall corporativo\n\n';
+                    errorMsg += 'Tente:\n';
+                    errorMsg += '• Desabilitar bloqueador de anúncios\n';
+                    errorMsg += '• Recarregar a página\n';
+                    errorMsg += '• Usar rede diferente';
                     
-                    showResult(resultDiv, result, 'success');
-                    
-                    // Enable data viewing buttons
-                    document.getElementById('viewDataBtn').disabled = false;
-                    document.getElementById('summaryBtn').disabled = false;
-                    
-                    // Auto-fetch data after 3 seconds
-                    setTimeout(() => {
-                        console.log('Auto-fetching data...');
-                        viewFinancialData();
-                    }, 3000);
-                },
-                onError: function(error) {
-                    showResult(resultDiv, `❌ Erro na conexão: ${error.message}`, 'error');
+                    showResult(resultDiv, errorMsg, 'error');
+                    return;
                 }
-            });
 
-            // Mount the widget
-            pluggyConnect.init('pluggy-connect');
+                console.log('🔗 Initializing Pluggy Connect with token:', connectToken.substring(0, 20) + '...');
+                
+                // Initialize Pluggy Connect Widget
+                const pluggyConnect = new PluggyConnect({
+                    connectToken: connectToken,
+                    includeSandbox: true,
+                    onSuccess: function(itemData) {
+                        console.log('✅ Pluggy Connect Success:', itemData);
+                        
+                        let result = `✅ Conta conectada com sucesso!\n\n`;
+                        result += `🔗 Item ID: ${itemData.itemId}\n`;
+                        result += `📊 Status: ${itemData.status}\n`;
+                        result += `🏦 Banco: ${itemData.connector?.name}\n`;
+                        result += `⏰ Conectado em: ${new Date().toLocaleString('pt-BR')}`;
+                        
+                        showResult(resultDiv, result, 'success');
+                        
+                        // Enable data viewing buttons
+                        document.getElementById('viewDataBtn').disabled = false;
+                        document.getElementById('summaryBtn').disabled = false;
+                        
+                        // Auto-fetch data after 3 seconds
+                        setTimeout(() => {
+                            console.log('Auto-fetching data...');
+                            viewFinancialData();
+                        }, 3000);
+                    },
+                    onError: function(error) {
+                        console.error('❌ Pluggy Connect Error:', error);
+                        showResult(resultDiv, `❌ Erro na conexão: ${error.message || 'Erro desconhecido'}`, 'error');
+                    },
+                    onEvent: function(eventName, data) {
+                        console.log('📡 Pluggy Event:', eventName, data);
+                        if (eventName === 'OPEN') {
+                            showResult(resultDiv, '🔄 Widget aberto. Selecione seu banco para conectar...', 'info');
+                        } else if (eventName === 'CLOSE') {
+                            showResult(resultDiv, '❌ Widget fechado pelo usuário', 'error');
+                        }
+                    }
+                });
+
+                // Add timeout for widget initialization
+                setTimeout(() => {
+                    const widgetElement = document.getElementById('pluggy-connect');
+                    if (!widgetElement.hasChildNodes() || widgetElement.children.length === 0) {
+                        showResult(resultDiv, '❌ Widget não inicializou. Tente recarregar a página.', 'error');
+                    }
+                }, 5000);
+
+                // Mount the widget
+                console.log('📱 Mounting widget to #pluggy-connect');
+                pluggyConnect.init('pluggy-connect');
+                
+                // Update status after mounting
+                setTimeout(() => {
+                    showResult(resultDiv, '🔄 Widget carregado. Aguarde a interface aparecer...', 'info');
+                }, 1000);
+                
+            } catch (error) {
+                console.error('❌ Widget initialization error:', error);
+                showResult(resultDiv, `❌ Erro ao inicializar widget: ${error.message}`, 'error');
+            }
         }
 
         // View financial data
@@ -478,6 +529,14 @@
         // Auto-run connectivity test on page load
         window.addEventListener('load', function() {
             console.log('🏦 Pluggy V2 Test Interface Loaded');
+            
+            // Check if Pluggy Connect script loaded
+            if (typeof PluggyConnect === 'undefined') {
+                console.warn('⚠️ Pluggy Connect widget script não carregou');
+            } else {
+                console.log('✅ Pluggy Connect widget disponível');
+            }
+            
             setTimeout(testConnection, 1000);
         });
     </script>
