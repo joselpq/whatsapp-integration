@@ -523,7 +523,7 @@ class PluggyV2 {
   /**
    * Store financial data (accounts and transactions) in database
    */
-  async storeFinancialData(db, itemId, accounts, clientUserId) {
+  async storeFinancialData(db, itemId, accounts, clientUserId = null) {
     try {
       console.log(`💾 Storing financial data for item: ${itemId}`);
       
@@ -544,6 +544,9 @@ class PluggyV2 {
         
         const userId = itemResult.rows[0].user_id;
         let connectorName = itemResult.rows[0].connector_name;
+        
+        // Use temporary clientUserId if not provided
+        const tempClientUserId = clientUserId || `item_${itemId.substring(0, 8)}`;
         
         // Store accounts
         for (const account of accounts) {
@@ -571,7 +574,7 @@ class PluggyV2 {
             userId,
             account.id,
             itemId,
-            clientUserId,
+            tempClientUserId,
             account.type,
             account.subtype,
             account.name,
@@ -609,7 +612,7 @@ class PluggyV2 {
                 userId,
                 transaction.id,
                 account.id,
-                clientUserId,
+                tempClientUserId,
                 transaction.date,
                 transaction.description,
                 transaction.amount,
