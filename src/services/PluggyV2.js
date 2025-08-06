@@ -368,22 +368,24 @@ class PluggyV2 {
       
       switch (event) {
         case 'item/created':
-          console.log(`✅ Item created: ${itemId} for user: ${clientUserId}`);
+          console.log(`✅ Item created: ${itemId}`);
           result.message = 'Bank connection created successfully';
           
-          // Store user-itemId mapping in database
-          if (db) {
-            // Handle missing clientUserId from webhook
-            const phoneNumber = clientUserId || 'unknown';
-            const userPhone = clientUserId ? `+${clientUserId}` : '+unknown';
+          // Store itemId in database without requiring clientUserId
+          if (db && itemId) {
+            // Use a temporary clientUserId to satisfy the NOT NULL constraint
+            const tempClientUserId = `item_${itemId.substring(0, 8)}`;
+            const tempUserPhone = `+temp_${itemId.substring(0, 8)}`;
             
             await this.storeItemMapping(db, {
-              userPhone,
+              userPhone: tempUserPhone,
               pluggyItemId: itemId,
-              clientUserId: phoneNumber,
+              clientUserId: tempClientUserId,
               event: 'item/created',
               status: 'CREATED'
             });
+            
+            console.log(`✅ Stored itemId ${itemId} with temporary mapping`);
           }
           
           // Fetch and store the financial data
