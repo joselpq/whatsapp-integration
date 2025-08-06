@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pluggy Connect - React Widget</title>
+    
+    <!-- React and ReactDOM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .step-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .step-number {
+            background: #0066ff;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: bold;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background: #0052cc;
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            width: 250px;
+            margin-right: 12px;
+        }
+        .result-box {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .widget-container {
+            margin: 20px 0;
+            min-height: 400px;
+            border: 2px dashed #0066ff;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .widget-placeholder {
+            text-align: center;
+            color: #666;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0066ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .pluggy-iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Main App Component
+        function App() {
+            const [phoneNumber, setPhoneNumber] = useState('+5511976196165');
+            const [connectToken, setConnectToken] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [testResult, setTestResult] = useState(null);
+            const [tokenResult, setTokenResult] = useState(null);
+            const [widgetReady, setWidgetReady] = useState(false);
+            const [connectionResult, setConnectionResult] = useState(null);
+            const [clientUserId, setClientUserId] = useState(null);
+            
+            // Test API connection on mount
+            useEffect(() => {
+                testConnection();
+            }, []);
+            
+            // Test API connection
+            const testConnection = async () => {
+                setIsLoading(true);
+                try {
+                    const response = await fetch('/api/pluggy-v2/test');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        setTestResult({
+                            type: 'success',
+                            message: `✅ API conectada! ${data.data.totalConnectors} bancos disponíveis.`
+                        });
+                    } else {
+                        throw new Error(data.error);
+                    }
+                } catch (error) {
+                    setTestResult({
+                        type: 'error',
+                        message: `❌ Erro: ${error.message}`
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            // Create connect token
+            const createToken = async () => {
+                if (!phoneNumber) {
+                    setTokenResult({
+                        type: 'error',
+                        message: 'Digite um número de telefone'
+                    });
+                    return;
+                }
+                
+                setIsLoading(true);
+                setTokenResult(null);
+                
+                try {
+                    const response = await fetch('/api/pluggy-v2/connect-token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phoneNumber })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        setConnectToken(data.data.connectToken);
+                        setClientUserId(data.data.clientUserId);
+                        setTokenResult({
+                            type: 'success',
+                            message: `✅ Token criado! User ID: ${data.data.clientUserId}`
+                        });
+                        setWidgetReady(true);
+                    } else {
+                        throw new Error(data.error);
+                    }
+                } catch (error) {
+                    setTokenResult({
+                        type: 'error',
+                        message: `❌ Erro: ${error.message}`
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            // Check user connections
+            const checkConnections = async () => {
+                if (!clientUserId) return;
+                
+                setIsLoading(true);
+                try {
+                    const response = await fetch(`/api/pluggy-v2/user/${clientUserId}/items`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.length > 0) {
+                        let message = `✅ ${data.data.length} conexão(ões) encontrada(s):\n\n`;
+                        data.data.forEach(item => {
+                            message += `🏦 ${item.connectorName} - Status: ${item.status}\n`;
+                        });
+                        setConnectionResult({
+                            type: 'success',
+                            message
+                        });
+                    } else {
+                        setConnectionResult({
+                            type: 'info',
+                            message: 'Nenhuma conexão encontrada ainda.'
+                        });
+                    }
+                } catch (error) {
+                    setConnectionResult({
+                        type: 'error',
+                        message: `❌ Erro: ${error.message}`
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            return (
+                <div className="container">
+                    <h1>🏦 Pluggy Connect - Integração React</h1>
+                    <p className="subtitle">Interface funcional usando React para o widget Pluggy</p>
+                    
+                    {/* Step 1: Test Connection */}
+                    <div className="step-container">
+                        <div className="step-header">
+                            <div className="step-number">1</div>
+                            <h3>Testar Conexão com API</h3>
+                        </div>
+                        <button onClick={testConnection} disabled={isLoading}>
+                            {isLoading && <span className="loading"></span>}
+                            Testar Conexão
+                        </button>
+                        {testResult && (
+                            <div className={`result-box ${testResult.type}`}>
+                                {testResult.message}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Step 2: Create Token */}
+                    <div className="step-container">
+                        <div className="step-header">
+                            <div className="step-number">2</div>
+                            <h3>Criar Token de Conexão</h3>
+                        </div>
+                        <input
+                            type="text"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            placeholder="+5511999999999"
+                        />
+                        <button onClick={createToken} disabled={isLoading}>
+                            {isLoading && <span className="loading"></span>}
+                            Criar Token
+                        </button>
+                        {tokenResult && (
+                            <div className={`result-box ${tokenResult.type}`}>
+                                {tokenResult.message}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Step 3: Pluggy Widget */}
+                    <div className="step-container">
+                        <div className="step-header">
+                            <div className="step-number">3</div>
+                            <h3>Conectar Conta Bancária</h3>
+                        </div>
+                        
+                        {widgetReady && connectToken ? (
+                            <PluggyWidget 
+                                connectToken={connectToken}
+                                onSuccess={() => {
+                                    setConnectionResult({
+                                        type: 'success',
+                                        message: '✅ Conta conectada com sucesso!'
+                                    });
+                                    setTimeout(checkConnections, 2000);
+                                }}
+                                onError={(error) => {
+                                    setConnectionResult({
+                                        type: 'error',
+                                        message: `❌ Erro na conexão: ${error}`
+                                    });
+                                }}
+                            />
+                        ) : (
+                            <div className="widget-container">
+                                <div className="widget-placeholder">
+                                    <p>🔐 Crie um token primeiro para carregar o widget</p>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {connectionResult && (
+                            <div className={`result-box ${connectionResult.type}`}>
+                                {connectionResult.message}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Step 4: Check Connections */}
+                    {clientUserId && (
+                        <div className="step-container">
+                            <div className="step-header">
+                                <div className="step-number">4</div>
+                                <h3>Verificar Conexões</h3>
+                            </div>
+                            <button onClick={checkConnections} disabled={isLoading}>
+                                {isLoading && <span className="loading"></span>}
+                                Verificar Conexões
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        
+        // Pluggy Widget Component
+        function PluggyWidget({ connectToken, onSuccess, onError }) {
+            const [isLoading, setIsLoading] = useState(true);
+            const iframeRef = useRef(null);
+            
+            useEffect(() => {
+                if (!connectToken) return;
+                
+                // Since we can't load the NPM package via CDN, we'll create a custom solution
+                // Option 1: Use Pluggy's iframe approach (if they provide one)
+                // Option 2: Create a popup window
+                // Option 3: Redirect to Pluggy's hosted connect page
+                
+                // For now, let's create a functional mock that demonstrates the flow
+                const mockWidget = () => {
+                    setIsLoading(false);
+                    
+                    // Create a simple interface that simulates the connection flow
+                    const container = document.getElementById('pluggy-widget-container');
+                    if (!container) return;
+                    
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <h3>🏦 Simulação do Widget Pluggy</h3>
+                            <p>Em produção, aqui apareceria o widget real do Pluggy.</p>
+                            <p style="margin: 20px 0;">Token: <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${connectToken.substring(0, 50)}...</code></p>
+                            
+                            <div style="margin: 30px 0;">
+                                <p><strong>Para implementar o widget real:</strong></p>
+                                <ol style="text-align: left; max-width: 500px; margin: 0 auto;">
+                                    <li>Instale: <code>npm install react-pluggy-connect</code></li>
+                                    <li>Importe o componente PluggyConnect</li>
+                                    <li>Passe o connectToken como prop</li>
+                                    <li>Configure os callbacks onSuccess e onError</li>
+                                </ol>
+                            </div>
+                            
+                            <button onclick="window.simulateSuccess()" style="
+                                background: #00c851;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                margin: 10px;
+                                cursor: pointer;
+                            ">Simular Sucesso</button>
+                            
+                            <button onclick="window.simulateError()" style="
+                                background: #ff4444;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                margin: 10px;
+                                cursor: pointer;
+                            ">Simular Erro</button>
+                        </div>
+                    `;
+                };
+                
+                // Set up mock callbacks
+                window.simulateSuccess = () => {
+                    onSuccess({
+                        itemId: 'mock-item-' + Date.now(),
+                        connector: { name: 'Banco Exemplo' },
+                        status: 'UPDATED'
+                    });
+                };
+                
+                window.simulateError = () => {
+                    onError('Simulação de erro de conexão');
+                };
+                
+                // Load the mock widget after a short delay
+                setTimeout(mockWidget, 1000);
+                
+            }, [connectToken]);
+            
+            return (
+                <div className="widget-container">
+                    {isLoading ? (
+                        <div className="widget-placeholder">
+                            <span className="loading"></span>
+                            <p>Carregando widget...</p>
+                        </div>
+                    ) : (
+                        <div id="pluggy-widget-container" style={{ width: '100%' }}></div>
+                    )}
+                </div>
+            );
+        }
+        
+        // Render the app
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
