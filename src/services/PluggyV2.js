@@ -351,9 +351,9 @@ class PluggyV2 {
   }
 
   /**
-   * Handle webhook from Pluggy and sync data
+   * Handle webhook from Pluggy and sync data to database
    */
-  async handleWebhook(payload) {
+  async handleWebhook(payload, db = null) {
     try {
       console.log('📥 Processing Pluggy webhook:', payload.event);
       
@@ -371,13 +371,32 @@ class PluggyV2 {
           console.log(`✅ Item created: ${itemId} for user: ${clientUserId}`);
           result.message = 'Bank connection created successfully';
           
+          // Store user-itemId mapping in database
+          if (db) {
+            await this.storeItemMapping(db, {
+              userPhone: `+${clientUserId}`, // Assuming clientUserId is phone digits
+              pluggyItemId: itemId,
+              clientUserId,
+              event: 'item/created',
+              status: 'CREATED'
+            });
+          }
+          
           // Fetch and store the financial data
-          console.log(`🔄 Syncing financial data for user: ${clientUserId}`);
+          console.log(`🔄 Syncing financial data for itemId: ${itemId}`);
           try {
-            const financialData = await this.getUserFinancialData(clientUserId);
-            console.log(`✅ Synced ${financialData.summary.totalAccounts} accounts and ${financialData.summary.totalTransactions} transactions`);
-            result.syncedData = financialData.summary;
-            // TODO: Store in database when DB connection is available
+            const accounts = await this.getAccounts(itemId);
+            console.log(`✅ Found ${accounts.length} accounts for item ${itemId}`);
+            
+            if (db && accounts.length > 0) {
+              await this.storeFinancialData(db, itemId, accounts, clientUserId);
+            }
+            
+            result.syncedData = {
+              itemId,
+              accountsFound: accounts.length,
+              accountsStored: db ? accounts.length : 0
+            };
           } catch (syncError) {
             console.error('⚠️ Failed to sync data after item creation:', syncError.message);
             result.syncError = syncError.message;
@@ -388,13 +407,26 @@ class PluggyV2 {
           console.log(`🔄 Item updated: ${itemId} for user: ${clientUserId}`);
           result.message = 'Bank connection updated with new data';
           
-          // Fetch and update the financial data
-          console.log(`🔄 Re-syncing financial data for user: ${clientUserId}`);
+          // Update status in database
+          if (db) {
+            await this.updateItemStatus(db, itemId, 'UPDATED');
+          }
+          
+          // Re-sync financial data
+          console.log(`🔄 Re-syncing financial data for itemId: ${itemId}`);
           try {
-            const financialData = await this.getUserFinancialData(clientUserId);
-            console.log(`✅ Re-synced ${financialData.summary.totalAccounts} accounts and ${financialData.summary.totalTransactions} transactions`);
-            result.syncedData = financialData.summary;
-            // TODO: Update in database when DB connection is available
+            const accounts = await this.getAccounts(itemId);
+            console.log(`✅ Re-synced ${accounts.length} accounts for item ${itemId}`);
+            
+            if (db && accounts.length > 0) {
+              await this.storeFinancialData(db, itemId, accounts, clientUserId);
+            }
+            
+            result.syncedData = {
+              itemId,
+              accountsFound: accounts.length,
+              accountsUpdated: db ? accounts.length : 0
+            };
           } catch (syncError) {
             console.error('⚠️ Failed to sync data after item update:', syncError.message);
             result.syncError = syncError.message;
@@ -405,11 +437,19 @@ class PluggyV2 {
           console.log(`❌ Item error: ${itemId} for user: ${clientUserId}`, data?.error);
           result.message = 'Bank connection encountered an error';
           result.error = data?.error;
+          
+          if (db) {
+            await this.updateItemStatus(db, itemId, 'ERROR', data?.error);
+          }
           break;
           
         case 'item/waiting_user_input':
           console.log(`⏳ Item waiting for user input: ${itemId}`);
           result.message = 'Bank connection waiting for additional user input (MFA, etc.)';
+          
+          if (db) {
+            await this.updateItemStatus(db, itemId, 'WAITING_USER_INPUT');
+          }
           break;
           
         default:
@@ -421,6 +461,215 @@ class PluggyV2 {
       
     } catch (error) {
       console.error('❌ Failed to process webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Store user-itemId mapping in database
+   */
+  async storeItemMapping(db, { userPhone, pluggyItemId, clientUserId, event, status }) {
+    try {
+      console.log(`💾 Storing item mapping: ${userPhone} → ${pluggyItemId}`);
+      
+      const client = await db.getClient();
+      
+      try {
+        // First, ensure user exists in users table
+        const userResult = await client.query(`
+          INSERT INTO users (phone_number, first_name, created_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (phone_number) DO UPDATE SET
+          updated_at = NOW()
+          RETURNING id
+        `, [userPhone, 'Pluggy User']);
+        
+        const userId = userResult.rows[0].id;
+        
+        // Store item with proper user_id reference
+        await client.query(`
+          INSERT INTO pluggy_v2_items (
+            user_id, pluggy_item_id, client_user_id, status, 
+            connector_name, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+          ON CONFLICT (user_id, pluggy_item_id) DO UPDATE SET
+          status = $4, updated_at = NOW()
+        `, [
+          userId,
+          pluggyItemId,
+          clientUserId,
+          status,
+          'Unknown' // Will be updated when we fetch account data
+        ]);
+        
+        console.log(`✅ Stored item mapping: ${userPhone} → ${pluggyItemId}`);
+        
+      } finally {
+        client.release();
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to store item mapping:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Store financial data (accounts and transactions) in database
+   */
+  async storeFinancialData(db, itemId, accounts, clientUserId) {
+    try {
+      console.log(`💾 Storing financial data for item: ${itemId}`);
+      
+      const client = await db.getClient();
+      
+      try {
+        await client.query('BEGIN');
+        
+        // Get user and item info from our database
+        const itemResult = await client.query(
+          'SELECT user_id, connector_name FROM pluggy_v2_items WHERE pluggy_item_id = $1',
+          [itemId]
+        );
+        
+        if (itemResult.rows.length === 0) {
+          throw new Error(`Item ${itemId} not found in database`);
+        }
+        
+        const userId = itemResult.rows[0].user_id;
+        let connectorName = itemResult.rows[0].connector_name;
+        
+        // Store accounts
+        for (const account of accounts) {
+          // Update connector name if we have it
+          if (account.connectorName && connectorName === 'Unknown') {
+            await client.query(
+              'UPDATE pluggy_v2_items SET connector_name = $1 WHERE pluggy_item_id = $2',
+              [account.connectorName, itemId]
+            );
+            connectorName = account.connectorName;
+          }
+          
+          // Store account using the existing schema
+          await client.query(`
+            INSERT INTO pluggy_v2_accounts (
+              user_id, pluggy_account_id, pluggy_item_id, client_user_id,
+              type, subtype, name, marketing_name, balance, currency_code, 
+              owner, account_number, tax_number, credit_data,
+              connector_name, connector_image_url,
+              created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
+            ON CONFLICT (user_id, pluggy_account_id) DO UPDATE SET
+            balance = $9, updated_at = NOW()
+          `, [
+            userId,
+            account.id,
+            itemId,
+            clientUserId,
+            account.type,
+            account.subtype,
+            account.name,
+            account.marketingName,
+            account.balance || 0,
+            account.currencyCode || 'BRL',
+            account.owner,
+            account.number,
+            account.taxNumber,
+            JSON.stringify(account.creditData),
+            connectorName,
+            account.connectorImageUrl
+          ]);
+          
+          console.log(`✅ Stored account: ${account.name} (${account.currencyCode} ${account.balance})`);
+          
+          // Store recent transactions for this account
+          try {
+            const { transactions } = await this.getTransactions(account.id, {
+              pageSize: 50, // Store recent 50 transactions
+              from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() // Last 30 days
+            });
+            
+            for (const transaction of transactions) {
+              await client.query(`
+                INSERT INTO pluggy_v2_transactions (
+                  user_id, pluggy_transaction_id, pluggy_account_id, client_user_id,
+                  transaction_date, description, amount, balance, currency_code, 
+                  category, category_id, transaction_type, payment_data, 
+                  credit_card_metadata, account_name, account_type, connector_name,
+                  created_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+                ON CONFLICT (user_id, pluggy_transaction_id) DO NOTHING
+              `, [
+                userId,
+                transaction.id,
+                account.id,
+                clientUserId,
+                transaction.date,
+                transaction.description,
+                transaction.amount,
+                transaction.balance,
+                transaction.currencyCode || 'BRL',
+                transaction.category,
+                transaction.categoryId,
+                transaction.type,
+                JSON.stringify(transaction.paymentData),
+                JSON.stringify(transaction.creditCardMetadata),
+                account.name,
+                account.type,
+                connectorName
+              ]);
+            }
+            
+            console.log(`✅ Stored ${transactions.length} transactions for account: ${account.name}`);
+            
+          } catch (txError) {
+            console.error(`⚠️ Failed to store transactions for account ${account.id}:`, txError.message);
+            // Don't fail the entire operation if transactions fail
+          }
+        }
+        
+        await client.query('COMMIT');
+        console.log(`✅ Stored complete financial data for item: ${itemId}`);
+        
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to store financial data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update item status in database
+   */
+  async updateItemStatus(db, itemId, status, errorDetails = null) {
+    try {
+      const client = await db.getClient();
+      
+      try {
+        await client.query(`
+          UPDATE pluggy_v2_items 
+          SET status = $1, error_details = $2, updated_at = NOW()
+          WHERE pluggy_item_id = $3
+        `, [
+          status,
+          errorDetails ? JSON.stringify(errorDetails) : null,
+          itemId
+        ]);
+        
+        console.log(`✅ Updated item ${itemId} status to: ${status}`);
+        
+      } finally {
+        client.release();
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to update item status:', error);
       throw error;
     }
   }
@@ -466,6 +715,148 @@ class PluggyV2 {
       
       console.error('❌ Connection test failed:', error.message);
       return result;
+    }
+  }
+
+  /**
+   * Get all consents - potentially provides user discovery
+   * Based on Pluggy docs: /reference/consents-list
+   */
+  async getConsents() {
+    try {
+      const apiKey = await this.authenticate();
+      
+      console.log('📋 Fetching all consents...');
+      
+      const response = await axios.get(`${this.baseUrl}/consents`, {
+        headers: {
+          'X-API-KEY': apiKey
+        }
+      });
+
+      const consents = response.data.results || response.data || [];
+      console.log(`✅ Retrieved ${consents.length} consents`);
+      
+      if (consents.length > 0) {
+        console.log('📊 Sample consent structure:');
+        console.log(JSON.stringify(consents[0], null, 2));
+      }
+      
+      return consents;
+      
+    } catch (error) {
+      console.error('❌ Failed to get consents:', error.response?.data || error.message);
+      throw new Error('Failed to get consents');
+    }
+  }
+
+  /**
+   * Debug method: Get ALL items without clientUserId filtering
+   * This tests if Pluggy allows bulk item discovery despite documentation
+   */
+  async getAllItems() {
+    try {
+      const apiKey = await this.authenticate();
+      
+      console.log('🔍 Fetching ALL items (no clientUserId filter)...');
+      
+      const response = await axios.get(`${this.baseUrl}/items`, {
+        headers: {
+          'X-API-KEY': apiKey
+        }
+        // Deliberately no params to test bulk discovery
+      });
+
+      const items = response.data.results || response.data || [];
+      console.log(`✅ Retrieved ${items.length} total items`);
+      
+      if (items.length > 0) {
+        // Analyze clientUserIds
+        const uniqueClientUserIds = [...new Set(items.map(item => item.clientUserId))].filter(Boolean);
+        console.log(`🆔 Unique clientUserIds found: ${uniqueClientUserIds.length}`);
+        
+        console.log('📊 Sample item structure:');
+        console.log(JSON.stringify(items[0], null, 2));
+      }
+      
+      return items;
+      
+    } catch (error) {
+      console.error('❌ Failed to get all items:', error.response?.data || error.message);
+      throw new Error('Failed to get all items');
+    }
+  }
+
+  /**
+   * Debug transactions with different parameters
+   */
+  async debugTransactions(accountId) {
+    try {
+      const apiKey = await this.authenticate();
+      
+      console.log(`🔍 Debug transactions for account: ${accountId}`);
+      
+      // Test different parameter combinations
+      const testCases = [
+        { description: 'No parameters', params: {} },
+        { description: 'Large page size', params: { pageSize: 500 } },
+        { description: 'Last 365 days', params: { 
+          from: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+          pageSize: 200 
+        }},
+        { description: 'All pages', params: { pageSize: 100, page: 0 } }
+      ];
+      
+      const results = [];
+      
+      for (const testCase of testCases) {
+        console.log(`\n🧪 Testing: ${testCase.description}`);
+        
+        try {
+          const response = await axios.get(`${this.baseUrl}/transactions`, {
+            headers: {
+              'X-API-KEY': apiKey
+            },
+            params: {
+              accountId: accountId,
+              ...testCase.params
+            }
+          });
+
+          const transactions = response.data.results || response.data || [];
+          const total = response.data.total || transactions.length;
+          const totalPages = response.data.totalPages || 1;
+          
+          console.log(`✅ Found ${transactions.length} transactions (total: ${total}, pages: ${totalPages})`);
+          
+          if (transactions.length > 0) {
+            console.log(`📊 Sample transaction: ${transactions[0].date}: ${transactions[0].description} - ${transactions[0].amount}`);
+          }
+          
+          results.push({
+            testCase: testCase.description,
+            success: true,
+            count: transactions.length,
+            total,
+            totalPages,
+            sampleTransaction: transactions[0] || null
+          });
+          
+        } catch (error) {
+          console.log(`❌ ${testCase.description} failed: ${error.response?.data?.message || error.message}`);
+          results.push({
+            testCase: testCase.description,
+            success: false,
+            error: error.response?.data || error.message
+          });
+        }
+      }
+      
+      return results;
+      
+    } catch (error) {
+      console.error('❌ Debug transactions failed:', error);
+      throw error;
     }
   }
 
