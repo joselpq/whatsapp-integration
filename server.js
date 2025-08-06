@@ -27,11 +27,6 @@ app.use(express.static('public'));
 // Serve React widget and its static assets
 app.use('/widget', express.static('public/widget'));
 
-// Serve React widget at /widget root (fallback for React Router)
-app.get('/widget/*', (req, res) => {
-  res.sendFile(__dirname + '/public/widget/index.html');
-});
-
 // Configuration
 const config = {
   webhookVerifyToken: process.env.WEBHOOK_VERIFY_TOKEN || 'zenmind-webhook-2025',
