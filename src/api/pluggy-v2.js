@@ -273,6 +273,45 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
+// Debug endpoint to check all items
+router.get('/debug/all-items', async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Fetching ALL items from Pluggy');
+    
+    const apiKey = await pluggy.authenticate();
+    const axios = require('axios');
+    
+    // Fetch ALL items without filtering by clientUserId
+    const response = await axios.get('https://api.pluggy.ai/items', {
+      headers: {
+        'X-API-KEY': apiKey
+      }
+      // No params - get ALL items
+    });
+    
+    const items = response.data.results || response.data || [];
+    
+    res.json({
+      success: true,
+      totalItems: items.length,
+      items: items.map(item => ({
+        id: item.id,
+        clientUserId: item.clientUserId,
+        connectorName: item.connector?.name,
+        status: item.status,
+        createdAt: item.createdAt
+      }))
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      error: error.response?.data || error.message
+    });
+  }
+});
+
 // Health check for this API
 router.get('/health', async (req, res) => {
   try {
