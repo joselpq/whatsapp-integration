@@ -24,6 +24,11 @@ app.use(express.json({
 // Serve static files for testing
 app.use(express.static('public'));
 
+// Serve React widget at /widget
+app.get('/widget', (req, res) => {
+  res.sendFile(__dirname + '/public/widget/index.html');
+});
+
 // Configuration
 const config = {
   webhookVerifyToken: process.env.WEBHOOK_VERIFY_TOKEN || 'zenmind-webhook-2025',
