@@ -373,10 +373,14 @@ class PluggyV2 {
           
           // Store user-itemId mapping in database
           if (db) {
+            // Handle missing clientUserId from webhook
+            const phoneNumber = clientUserId || 'unknown';
+            const userPhone = clientUserId ? `+${clientUserId}` : '+unknown';
+            
             await this.storeItemMapping(db, {
-              userPhone: `+${clientUserId}`, // Assuming clientUserId is phone digits
+              userPhone,
               pluggyItemId: itemId,
-              clientUserId,
+              clientUserId: phoneNumber,
               event: 'item/created',
               status: 'CREATED'
             });
