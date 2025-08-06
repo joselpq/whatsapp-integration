@@ -1,124 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { PluggyConnect } from 'react-pluggy-connect';
 import './App.css';
-
-// Type definitions for Pluggy Connect
-interface PluggyConnectProps {
-  connectToken: string;
-  onSuccess: (itemData: any) => void;
-  onError: (error: any) => void;
-  includeSandbox?: boolean;
-}
-
-// Mock PluggyConnect component since the real package might have issues
-const PluggyConnect: React.FC<PluggyConnectProps> = ({ 
-  connectToken, 
-  onSuccess, 
-  onError, 
-  includeSandbox = true 
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleConnectBank = () => {
-    setIsLoading(true);
-    
-    // Simulate bank connection process
-    setTimeout(() => {
-      setIsLoading(false);
-      // Mock successful connection
-      onSuccess({
-        itemId: 'mock-item-id-12345',
-        connectorId: 200,
-        connectorName: 'MeuPluggy',
-        status: 'UPDATED',
-        message: 'Bank connection successful!'
-      });
-    }, 3000);
-  };
-
-  const handleError = () => {
-    onError({
-      message: 'Connection failed - simulated error',
-      code: 'MOCK_ERROR'
-    });
-  };
-
-  return (
-    <div style={{ 
-      border: '2px dashed #ccc', 
-      padding: '40px', 
-      textAlign: 'center',
-      borderRadius: '8px',
-      backgroundColor: '#f9f9f9'
-    }}>
-      <h3>🏦 Mock Pluggy Connect Widget</h3>
-      <p style={{ color: '#666', marginBottom: '20px' }}>
-        Connect Token: {connectToken.substring(0, 20)}...
-      </p>
-      <p style={{ color: '#666', marginBottom: '20px' }}>
-        Sandbox Mode: {includeSandbox ? 'Enabled' : 'Disabled'}
-      </p>
-      
-      {isLoading ? (
-        <div>
-          <p>🔄 Connecting to bank...</p>
-          <div style={{ 
-            width: '100%', 
-            height: '4px', 
-            backgroundColor: '#e0e0e0',
-            borderRadius: '2px',
-            marginTop: '10px'
-          }}>
-            <div style={{
-              width: '30%',
-              height: '100%',
-              backgroundColor: '#4CAF50',
-              borderRadius: '2px',
-              animation: 'progress 2s infinite'
-            }} />
-          </div>
-        </div>
-      ) : (
-        <div>
-          <button 
-            onClick={handleConnectBank}
-            style={{
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              padding: '12px 24px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginRight: '10px'
-            }}
-          >
-            🎯 Connect Bank (Success)
-          </button>
-          
-          <button 
-            onClick={handleError}
-            style={{
-              backgroundColor: '#f44336',
-              color: 'white',
-              padding: '12px 24px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}
-          >
-            ❌ Test Error
-          </button>
-        </div>
-      )}
-      
-      <p style={{ fontSize: '12px', color: '#999', marginTop: '20px' }}>
-        This is a mock widget for testing. Replace with real PluggyConnect component.
-      </p>
-    </div>
-  );
-};
 
 interface ConnectTokenData {
   connectToken: string;
@@ -372,13 +255,15 @@ function App() {
         <h3>📋 Instructions</h3>
         <ol style={{ paddingLeft: '20px', lineHeight: '1.6' }}>
           <li>Enter your phone number and click "Create Connect Token"</li>
-          <li>Use the mock widget to simulate bank connection (click "Connect Bank")</li>
+          <li>Select your bank from the Pluggy Connect widget</li>
+          <li>Enter your real bank credentials (or use sandbox credentials for testing)</li>
+          <li>Complete any multi-factor authentication if required</li>
           <li>After successful connection, click "Check Financial Data" to verify the integration</li>
         </ol>
         
         <p style={{ marginTop: '15px', color: '#666' }}>
-          <strong>Note:</strong> This is using a mock widget for demonstration. 
-          Replace the PluggyConnect component with the real react-pluggy-connect package for production use.
+          <strong>Production Mode:</strong> Using real Pluggy Connect widget. 
+          Connect with actual bank credentials to test the complete Open Finance integration.
         </p>
       </div>
     </div>
