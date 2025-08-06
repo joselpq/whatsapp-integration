@@ -25,6 +25,16 @@ This document summarizes our **COMPLETE** Pluggy Open Finance integration, inclu
 - **Transaction Discovery**: 1-year transaction history visible in dashboard but not via API
 - **Automatic ID Discovery**: Need programmatic way to find item/account IDs vs manual lookup
 
+### ❓ **What We DON'T Know Yet (Critical Gaps)**
+- **User Resource Mapping**: How to programmatically find user's items/accounts from phone number
+- **Complete Data Types**: What other data beyond accounts is available (investments, identity, etc.)
+- **Transaction Endpoints**: Correct API calls to access the 1-year transaction history visible in dashboard
+- **Database Compatibility**: Whether Pluggy JSON formats match our PostgreSQL schema
+- **Multi-User Scaling**: How the system works with multiple users simultaneously
+- **Production Data Differences**: How sandbox vs. production data/behavior differs
+- **Mystery ID Types**: What the additional IDs in Pluggy dashboard actually represent
+- **Webhook Data Completeness**: What data webhooks provide vs. what needs separate API calls
+
 ## 🧪 **END-TO-END TESTING RESULTS**
 
 ### ✅ **Successful Test Case (August 2025)**
@@ -316,32 +326,48 @@ Access: `https://your-app.up.railway.app/pluggy-v2-token-only.html`
 
 ### 🚨 **Critical Issues Needing Resolution**
 
-#### 1. **Fix clientUserId Filtering (HIGH PRIORITY)**
+#### 1. **User ID Mapping & Discovery (CRITICAL PRIORITY)**
+**Problem**: No systematic way to map phone numbers to Pluggy user resources
+**Impact**: Cannot scale to multiple users - each requires manual ID discovery
+**Current Gap**: We know test user `+5511999999998` has item `257adfd4-1fa7-497c-8231-5e6c31312cb1`, but how do we find this programmatically?
+**Next Steps**: 
+- Research Pluggy's user/item lookup APIs
+- Test if webhooks contain the necessary ID mapping data
+- Build a user resource discovery system
+
+#### 2. **Complete Data Schema Discovery (HIGH PRIORITY)**
+**Problem**: We've only tested account data - haven't explored full data available
+**Current Status**: 
+- ✅ **Accounts**: Working (2 accounts found)
+- ❌ **Transactions**: 0 found (dashboard shows 1-year history)
+- ❓ **Investments**: Mystery ID `0325bc2d-e74e-4656-91ea-9f22f00c3d3a` untested
+- ❓ **Identity Data**: Mystery ID `5b5f4139-2361-42c3-8498-3d4ac8ef1e80` untested
+- ❓ **Other Data Types**: Unknown what else might be available
+**Next Steps**:
+- Test all mystery IDs with different API endpoints
+- Map out complete Pluggy data schema
+- Document all available data types and their endpoints
+
+#### 3. **Database Storage & Format Validation (HIGH PRIORITY)**
+**Problem**: Haven't tested actual database storage of Pluggy data formats
+**Current Status**: 
+- ✅ **Schema Created**: All tables exist
+- ❌ **Data Insertion**: Never tested with real Pluggy data formats
+- ❓ **Data Mapping**: Don't know if Pluggy JSON matches our schema
+- ❓ **Edge Cases**: Haven't tested different account types, transaction formats
+**Next Steps**:
+- Write test script to store real Pluggy data in database
+- Validate JSON structure matches our PostgreSQL schema
+- Test with different bank/account types for schema completeness
+- Document any required schema modifications
+
+#### 4. **clientUserId API Filtering (MEDIUM PRIORITY)**
 **Problem**: `GET /api/pluggy-v2/user/{clientUserId}/items` returns "Failed to get items"
-**Impact**: Cannot programmatically fetch user's connected banks
+**Impact**: Cannot use standard user-based API calls (but might be solved by #1)
 **Current Workaround**: Manual item ID lookup in Pluggy dashboard
 **Next Steps**: 
-- Debug the exact API query parameters Pluggy expects
-- Check if clientUserId format needs modification
-- Test with different query approaches
-
-#### 2. **Transaction Data Access (HIGH PRIORITY)**  
-**Problem**: Dashboard shows 1-year transaction history, API returns 0 transactions
-**Impact**: Cannot access user's financial transaction data
-**Current Status**: Account data works perfectly, transactions don't
-**Next Steps**:
-- Test different transaction query parameters (date ranges, pagination)
-- Check if sandbox vs production affects transaction availability
-- Investigate the mystery IDs that might contain transaction data
-
-#### 3. **Automatic Resource Discovery (MEDIUM PRIORITY)**
-**Problem**: Need to manually find item/account IDs in Pluggy dashboard  
-**Impact**: Not scalable for production use with many users
-**Current Workaround**: Debug endpoint `/debug/all-items` (has auth issues)
-**Next Steps**:
-- Fix the debug endpoint authentication
-- Create a user resource discovery API
-- Map webhook events to automatic data fetching
+- Debug exact API query parameters Pluggy expects
+- Test different clientUserId formats and approaches
 
 ### ✅ **Quick Wins Available**
 
@@ -489,22 +515,41 @@ console.log(`Found ${financialData.transactions.length} transactions`);
 - **Schema**: See `/scripts/add-pluggy-v2-tables.js`
 - **Test Data**: Use clientUserId `5511999999998` for verified test case
 - **Webhook Data**: Currently fetched but not persisted (easy implementation)
+- **⚠️ UNTESTED**: We've never actually stored Pluggy data in database - need to validate schema compatibility
+
+### 🔬 **For Investigation & Research Tasks**
+- **Mystery IDs**: Test IDs `5b5f4139-2361-42c3-8498-3d4ac8ef1e80` and `0325bc2d-e74e-4656-91ea-9f22f00c3d3a`
+- **Transaction Access**: Compare dashboard vs API - why can't we access transactions?
+- **User Discovery**: Research Pluggy docs/APIs for user resource mapping
+- **Data Types**: Map out complete Pluggy data schema beyond basic accounts
+- **Webhook Payloads**: Analyze webhook data to find user/resource mapping info
+- **Production Testing**: Test with real bank (non-sandbox) to compare data availability
 
 ## 🎯 **CONCLUSION**
 
-**Status**: **PRODUCTION READY WITH MINOR OPTIMIZATIONS NEEDED**
+**Status**: **PROOF OF CONCEPT SUCCESS - PRODUCTION READINESS REQUIRES INVESTIGATION**
 
-✅ **Complete end-to-end integration working**  
-✅ **Real bank connections successful**  
-✅ **Account data retrieval confirmed**  
-✅ **Webhook processing functional**  
-✅ **Production deployment operational**  
+### ✅ **Proven Working**
+- **Single User Flow**: Complete bank connection for one test case
+- **Account Data**: Successfully retrieved account balances and details
+- **Widget Integration**: Real Pluggy Connect widget deployed and functional
+- **Webhook Processing**: Events received and processed correctly
+- **Infrastructure**: All APIs, database, deployment working perfectly
 
-⚠️ **Two optimization tasks remain**:
-1. Fix clientUserId filtering for scalable user data access
-2. Resolve transaction data retrieval (likely parameter/timing issue)
+### 🔍 **Critical Unknowns for Production**
+- **Multi-User Support**: How to scale beyond manual ID discovery
+- **Complete Data Access**: Only tested accounts, not transactions/investments/identity
+- **Database Storage**: Schema compatibility never validated with real data
+- **Production Differences**: All testing done in sandbox environment
 
-**The core integration is solid and ready for production use.**
+### 📊 **Development Confidence Levels**
+- **Backend API Infrastructure**: 90% - Solid foundation
+- **Single User Bank Connection**: 80% - Working but manual process
+- **Multi-User Scalability**: 20% - Major unknowns remain
+- **Complete Data Retrieval**: 30% - Only accounts tested
+- **Production Readiness**: 40% - Needs investigation and testing
+
+**Summary**: Excellent foundation built, but significant investigation needed before production deployment with multiple users.
 
 ---
 
