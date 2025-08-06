@@ -81,35 +81,141 @@ POST /api/pluggy-v2/webhook                       // Webhook handler
 ### The Widget Problem
 **Discovery**: Pluggy no longer provides a CDN-hosted widget script. The URL `https://cdn.pluggy.ai/web/v3/pluggy-connect.js` returns 404.
 
-### Current Frontend Options
+### Current Frontend Solutions Available
 
-#### Option 1: React Component (Recommended)
-```bash
-npm install react-pluggy-connect
-```
+#### 1. Mock Testing Interface ✅
+**URL**: `/pluggy-react-widget.html`
+- Uses React via CDN (no build tools needed)
+- Demonstrates the complete flow with a mock widget
+- Shows exactly where to integrate the real NPM package
+- Fully functional API integration
 
-```jsx
-import PluggyConnect from 'react-pluggy-connect';
+#### 2. Token Generator Interface ✅
+**URL**: `/pluggy-v2-token-only.html`
+- Generates valid connect tokens
+- Displays tokens for manual testing
+- Checks connection status
 
-function PluggyWidget({ connectToken }) {
-  return (
-    <PluggyConnect
-      connectToken={connectToken}
-      onSuccess={(data) => console.log('Connected:', data)}
-      onError={(error) => console.error('Error:', error)}
-      includeSandbox={true}
-    />
-  );
-}
-```
+#### 3. Implementation Guide ✅
+**Location**: `/src/components/PluggyConnectImplementation.md`
+- Complete code examples
+- Step-by-step integration instructions
+- Security best practices
+- Common issues and solutions
 
-#### Option 2: React Native
-```bash
-npm install react-native-pluggy-connect
-```
+### Production Frontend Implementation Steps
 
-#### Option 3: Direct API Integration
-Skip the widget and implement the connection flow manually using Pluggy's APIs.
+#### Option 1: Standalone React App (Recommended for Quick Deployment)
+
+1. **Create a new React app**:
+   ```bash
+   npx create-react-app pluggy-widget
+   cd pluggy-widget
+   npm install react-pluggy-connect axios
+   ```
+
+2. **Replace App.js with the widget code**:
+   ```jsx
+   import React, { useState } from 'react';
+   import PluggyConnect from 'react-pluggy-connect';
+   import axios from 'axios';
+
+   function App() {
+     const [connectToken, setConnectToken] = useState(null);
+     const API_URL = process.env.REACT_APP_API_URL || 'https://your-api.com';
+
+     const createToken = async () => {
+       try {
+         const response = await axios.post(`${API_URL}/api/pluggy-v2/connect-token`, {
+           phoneNumber: '+5511999999999' // Get from user input
+         });
+         setConnectToken(response.data.data.connectToken);
+       } catch (error) {
+         console.error('Token creation failed:', error);
+       }
+     };
+
+     const handleSuccess = (itemData) => {
+       console.log('Success:', itemData);
+       // Redirect or show success message
+     };
+
+     return (
+       <div style={{ padding: '20px' }}>
+         {!connectToken ? (
+           <button onClick={createToken}>Connect Bank Account</button>
+         ) : (
+           <PluggyConnect
+             connectToken={connectToken}
+             onSuccess={handleSuccess}
+             onError={(error) => console.error(error)}
+             includeSandbox={true}
+           />
+         )}
+       </div>
+     );
+   }
+
+   export default App;
+   ```
+
+3. **Add environment variables**:
+   ```bash
+   # .env
+   REACT_APP_API_URL=https://whatsapp-integration-production-06bb.up.railway.app
+   ```
+
+4. **Deploy to Vercel**:
+   ```bash
+   npm run build
+   npm i -g vercel
+   vercel --prod
+   ```
+
+5. **Embed in your main app**:
+   ```html
+   <!-- In your main application -->
+   <iframe 
+     src="https://your-pluggy-widget.vercel.app" 
+     width="100%" 
+     height="600"
+     style="border: none; border-radius: 8px;">
+   </iframe>
+   ```
+
+#### Option 2: Integrate into Existing React App
+
+1. **Install the package**:
+   ```bash
+   npm install react-pluggy-connect
+   ```
+
+2. **Create a component** using the code from `/src/components/PluggyConnectImplementation.md`
+
+3. **Import and use** in your existing app
+
+#### Option 3: Microservice Architecture
+
+1. **Use the template** at `/src/components/pluggy-widget-app/`
+2. **Deploy as separate service**
+3. **Communicate via postMessage** or redirects
+
+### Testing the Integration
+
+1. **Development Testing**:
+   - Use `/pluggy-react-widget.html` to understand the flow
+   - Test with sandbox institutions
+   - Mock success/error scenarios
+
+2. **Integration Testing**:
+   - Generate real tokens via API
+   - Connect sandbox accounts
+   - Verify webhook callbacks
+
+3. **Production Testing**:
+   - Remove `includeSandbox` flag
+   - Test with real bank credentials
+   - Monitor error rates
 
 ## Key Discoveries
 
