@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pluggy V2 - Token Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2c3e50; text-align: center; }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 250px;
+            margin-right: 10px;
+        }
+        .token-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            border: 2px dashed #6c757d;
+        }
+        .copy-btn {
+            background: #28a745;
+            padding: 8px 16px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏦 Pluggy V2 - Gerador de Token</h1>
+        
+        <div class="warning">
+            <strong>⚠️ Widget Issue:</strong> O widget Pluggy Connect não está disponível via CDN. 
+            Esta página gera tokens válidos que você pode usar com:
+            <ul>
+                <li>Aplicações React usando <code>npm install react-pluggy-connect</code></li>
+                <li>Postman/Insomnia para testes diretos da API</li>
+                <li>Qualquer cliente Pluggy Connect oficial</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>1. Testar Conexão</h3>
+            <button onclick="testAPI()">Verificar API</button>
+            <div id="testResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>2. Gerar Connect Token</h3>
+            <input type="text" id="phoneNumber" placeholder="+5511976196165" value="+5511976196165">
+            <button onclick="generateToken()">Gerar Token</button>
+            <div id="tokenResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>3. Verificar Conexões</h3>
+            <button id="checkBtn" onclick="checkConnections()" disabled>Verificar Items</button>
+            <div id="itemsResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>4. Como Usar o Token</h3>
+            <div class="result">
+                <h4>Opção A: Com React</h4>
+                <pre>
+import PluggyConnect from 'react-pluggy-connect';
+
+&lt;PluggyConnect
+  connectToken="SEU_TOKEN_AQUI"
+  onSuccess={(data) => console.log(data)}
+  onError={(error) => console.error(error)}
+/&gt;</pre>
+
+                <h4>Opção B: API Direta (Postman)</h4>
+                <p>Use o token no header <code>X-Connect-Token</code> para chamadas diretas à API Pluggy.</p>
+
+                <h4>Opção C: Sandbox Pluggy</h4>
+                <p>Acesse <a href="https://dashboard.pluggy.ai" target="_blank">dashboard.pluggy.ai</a> para testar em ambiente sandbox.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUserId = null;
+        let currentToken = null;
+
+        async function testAPI() {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = 'Testando...';
+
+            try {
+                const response = await fetch('/api/pluggy-v2/test');
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✅ API funcionando! ${data.data.totalConnectors} bancos disponíveis.`;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Erro: ${error.message}`;
+            }
+        }
+
+        async function generateToken() {
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const resultDiv = document.getElementById('tokenResult');
+            
+            if (!phoneNumber) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = 'Digite um número de telefone';
+                return;
+            }
+
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = 'Gerando token...';
+
+            try {
+                const response = await fetch('/api/pluggy-v2/connect-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUserId = data.data.clientUserId;
+                    currentToken = data.data.connectToken;
+                    
+                    document.getElementById('checkBtn').disabled = false;
+
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        ✅ Token gerado com sucesso!<br>
+                        <strong>User ID:</strong> ${currentUserId}<br>
+                        <strong>Expira em:</strong> ${new Date(data.data.expiresAt).toLocaleString('pt-BR')}<br><br>
+                        <strong>Connect Token:</strong>
+                        <div class="token-display" id="tokenDisplay">${currentToken}</div>
+                        <button class="copy-btn" onclick="copyToken()">📋 Copiar Token</button>
+                    `;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Erro: ${error.message}`;
+            }
+        }
+
+        function copyToken() {
+            if (!currentToken) return;
+            
+            navigator.clipboard.writeText(currentToken).then(() => {
+                alert('✅ Token copiado para a área de transferência!');
+            }).catch(() => {
+                // Fallback
+                const tokenDisplay = document.getElementById('tokenDisplay');
+                const range = document.createRange();
+                range.selectNodeContents(tokenDisplay);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                document.execCommand('copy');
+                alert('✅ Token copiado!');
+            });
+        }
+
+        async function checkConnections() {
+            if (!currentUserId) return;
+
+            const resultDiv = document.getElementById('itemsResult');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = 'Verificando conexões...';
+
+            try {
+                const response = await fetch(`/api/pluggy-v2/user/${currentUserId}/items`);
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.data.length === 0) {
+                        resultDiv.innerHTML = 'ℹ️ Nenhuma conexão encontrada ainda.<br>Use o token gerado em um cliente Pluggy Connect.';
+                    } else {
+                        let html = `✅ ${data.data.length} conexão(ões) encontrada(s):<br><br>`;
+                        data.data.forEach(item => {
+                            html += `🏦 <strong>${item.connectorName}</strong><br>`;
+                            html += `Status: ${item.status}<br>`;
+                            html += `ID: ${item.id}<br><br>`;
+                        });
+                        resultDiv.className = 'result success';
+                        resultDiv.innerHTML = html;
+                    }
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Erro: ${error.message}`;
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(testAPI, 500);
+        });
+    </script>
+</body>
+</html>
