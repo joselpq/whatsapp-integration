@@ -351,7 +351,7 @@ class PluggyV2 {
   }
 
   /**
-   * Handle webhook from Pluggy
+   * Handle webhook from Pluggy and sync data
    */
   async handleWebhook(payload) {
     try {
@@ -370,11 +370,35 @@ class PluggyV2 {
         case 'item/created':
           console.log(`✅ Item created: ${itemId} for user: ${clientUserId}`);
           result.message = 'Bank connection created successfully';
+          
+          // Fetch and store the financial data
+          console.log(`🔄 Syncing financial data for user: ${clientUserId}`);
+          try {
+            const financialData = await this.getUserFinancialData(clientUserId);
+            console.log(`✅ Synced ${financialData.summary.totalAccounts} accounts and ${financialData.summary.totalTransactions} transactions`);
+            result.syncedData = financialData.summary;
+            // TODO: Store in database when DB connection is available
+          } catch (syncError) {
+            console.error('⚠️ Failed to sync data after item creation:', syncError.message);
+            result.syncError = syncError.message;
+          }
           break;
           
         case 'item/updated':
           console.log(`🔄 Item updated: ${itemId} for user: ${clientUserId}`);
           result.message = 'Bank connection updated with new data';
+          
+          // Fetch and update the financial data
+          console.log(`🔄 Re-syncing financial data for user: ${clientUserId}`);
+          try {
+            const financialData = await this.getUserFinancialData(clientUserId);
+            console.log(`✅ Re-synced ${financialData.summary.totalAccounts} accounts and ${financialData.summary.totalTransactions} transactions`);
+            result.syncedData = financialData.summary;
+            // TODO: Update in database when DB connection is available
+          } catch (syncError) {
+            console.error('⚠️ Failed to sync data after item update:', syncError.message);
+            result.syncError = syncError.message;
+          }
           break;
           
         case 'item/error':
