@@ -654,7 +654,7 @@ class PluggyV2 {
       try {
         await client.query(`
           UPDATE pluggy_v2_items 
-          SET status = $1, error_details = $2, updated_at = NOW()
+          SET status = $1, status_detail = $2, updated_at = NOW()
           WHERE pluggy_item_id = $3
         `, [
           status,
