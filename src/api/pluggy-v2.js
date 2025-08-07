@@ -471,28 +471,71 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-// Debug endpoint to check all items
+// Debug endpoint to check all items stored in our database
 router.get('/debug/all-items', async (req, res) => {
   try {
-    console.log('🔍 DEBUG: Using new getAllItems method');
+    console.log('🔍 DEBUG: Querying database for all stored items');
     
-    const items = await pluggy.getAllItems();
+    const db = require('../database/db');
+    const client = await db.getClient();
     
-    res.json({
-      success: true,
-      totalItems: items.length,
-      items: items.map(item => ({
-        id: item.id,
-        clientUserId: item.clientUserId,
-        connectorName: item.connector?.name,
-        status: item.status,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt
-      }))
-    });
+    try {
+      // Query our database for all stored items
+      const itemsResult = await client.query(`
+        SELECT 
+          i.pluggy_item_id,
+          i.client_user_id,
+          i.connector_name,
+          i.status,
+          i.created_at,
+          i.updated_at,
+          u.phone_number
+        FROM pluggy_v2_items i
+        LEFT JOIN users u ON i.user_id = u.id
+        ORDER BY i.created_at DESC
+        LIMIT 20
+      `);
+      
+      // Also check recent webhook events
+      const webhooksResult = await client.query(`
+        SELECT 
+          event_type,
+          pluggy_item_id,
+          processed,
+          created_at,
+          event_data
+        FROM pluggy_v2_webhooks
+        ORDER BY created_at DESC
+        LIMIT 10
+      `);
+      
+      res.json({
+        success: true,
+        totalItems: itemsResult.rows.length,
+        items: itemsResult.rows.map(item => ({
+          itemId: item.pluggy_item_id,
+          clientUserId: item.client_user_id,
+          phoneNumber: item.phone_number,
+          connectorName: item.connector_name,
+          status: item.status,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at
+        })),
+        recentWebhooks: webhooksResult.rows.map(webhook => ({
+          event: webhook.event_type,
+          itemId: webhook.pluggy_item_id,
+          processed: webhook.processed,
+          createdAt: webhook.created_at,
+          data: webhook.event_data
+        }))
+      });
+      
+    } finally {
+      client.release();
+    }
     
   } catch (error) {
-    console.error('❌ Debug endpoint error:', error.message);
+    console.error('❌ Database query error:', error.message);
     res.status(500).json({
       success: false,
       error: error.message
