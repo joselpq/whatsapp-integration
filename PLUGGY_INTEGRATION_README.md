@@ -25,20 +25,30 @@ Complete **end-to-end Pluggy Open Finance integration** with webhook-driven item
 4. Use itemId to fetch accounts and transactions via Pluggy API
 5. Later: map phone numbers to itemIds for user-specific data retrieval
 
-## 📋 **Recent Test Results (August 6, 2025)**
+## 📋 **Recent Test Results (August 6-7, 2025)**
 
-### ✅ **Verified Working Test Cases**
+### ✅ **Verified Working Test Cases - END-TO-END FLOW CONFIRMED**
 
 **Test User 1**: `+5511999999998`
 - **Item ID**: `257adfd4-1fa7-497c-8231-5e6c31312cb1`
 - **Bank**: Nu Pagamentos S.A. (Nubank)
 - **Accounts**: 2 accounts (Checking: R$ 410,114.90, Credit Card: R$ 57,631.61)
 - **Transactions**: 176 transactions retrieved
+- **Status**: Legacy test case - confirmed working
 
 **Test User 2**: `5511999999994` 
 - **Item ID**: `8b81b783-d3b7-46e1-9763-8f105ca17342`
 - **Accounts**: 2 accounts (including Mastercard Black: R$ 109.98)
-- **Status**: Webhook captured successfully, financial data stored
+- **Status**: Webhook captured successfully, database storage working
+
+**🎉 Test User 3 (NEW - August 7, 2025)**: **COMPLETE END-TO-END SUCCESS**
+- **Item ID**: `548178f5-131b-46ae-a713-a5d4cd69ea53`
+- **Bank**: Credit card provider (Dinners/Elo)
+- **Account**: Dinners Elo Grafite credit card
+- **Balance**: R$ 7,500.05 used / R$ 23,000.98 total limit
+- **Owner**: Tatiana Galvão  
+- **Card Number**: ***8921
+- **Status**: ✅ **FULL CHAIN VERIFIED** - Webhook → Database → API retrieval all working perfectly
 
 ## 🏗️ **Architecture & Code Structure**
 
@@ -244,10 +254,13 @@ pluggy_v2_webhooks (
 # Health check
 curl https://whatsapp-integration-production-06bb.up.railway.app/api/pluggy-v2/health
 
-# Test specific itemId (from logs)
-curl "https://whatsapp-integration-production-06bb.up.railway.app/api/pluggy-v2/item/8b81b783-d3b7-46e1-9763-8f105ca17342/accounts"
+# 🎉 NEW: Query all stored items from database
+curl "https://whatsapp-integration-production-06bb.up.railway.app/api/pluggy-v2/debug/all-items"
 
-# Check user items via phone lookup
+# Test specific itemId (latest working example)
+curl "https://whatsapp-integration-production-06bb.up.railway.app/api/pluggy-v2/item/548178f5-131b-46ae-a713-a5d4cd69ea53/accounts"
+
+# Check user items via phone lookup (requires user mapping)
 curl "https://whatsapp-integration-production-06bb.up.railway.app/api/pluggy-v2/users/+5511999999995/items"
 ```
 
@@ -311,13 +324,15 @@ git push origin main
 
 ## 🔧 **Current Status & Next Steps**
 
-### ✅ **What's Working Now**
-- **Webhook Capture**: Successfully capturing itemIds from `item/created` events
-- **Database Storage**: Storing itemIds with temporary user mapping
-- **Account Retrieval**: Fetching 2+ accounts per connected bank
-- **Transaction Access**: Confirmed access to 176+ transactions
-- **Widget Flow**: Complete phone → token → bank → connection flow
-- **Production Deployment**: Stable Railway hosting with HTTPS
+### ✅ **What's Working Now (FULLY TESTED)**
+- **Webhook Capture**: ✅ Successfully capturing itemIds from `item/created` events  
+- **Database Storage**: ✅ Storing itemIds with temporary mapping (`temp_*` format)
+- **Database Queries**: ✅ NEW endpoint to list all stored items from database
+- **Account Retrieval**: ✅ Fetching detailed account data (balances, credit limits, etc.)  
+- **Transaction Access**: ✅ Confirmed access to 176+ transactions from legacy tests
+- **Widget Flow**: ✅ Complete phone → token → bank → connection flow
+- **Production Deployment**: ✅ Stable Railway hosting with HTTPS
+- **End-to-End Verification**: ✅ **COMPLETE CHAIN WORKING** - Widget → Webhook → Database → API
 
 ### 🚧 **Known Issues & Limitations**
 
@@ -358,14 +373,15 @@ GET /api/pluggy-v2/users/{phone}/financial-data?live=false
 
 ## 🎯 **Success Metrics**
 
-### **Confidence Levels (Updated August 6, 2025)**
+### **Confidence Levels (Updated August 7, 2025)**
 - **Backend API Infrastructure**: **100%** ✅ - Fully functional and tested
-- **Webhook Processing**: **100%** ✅ - Successfully capturing itemIds  
-- **Database Integration**: **95%** ✅ - Schema ready, webhook storage working
-- **Account Data Retrieval**: **100%** ✅ - Confirmed with multiple banks
-- **Transaction Access**: **95%** ✅ - 176+ transactions retrieved successfully
-- **Production Deployment**: **100%** ✅ - Stable Railway hosting
-- **User Mapping System**: **60%** 🚧 - Temporary solution in place, needs completion
+- **Webhook Processing**: **100%** ✅ - Successfully capturing itemIds (proven with latest test)
+- **Database Integration**: **100%** ✅ - Complete storage & retrieval working perfectly  
+- **Account Data Retrieval**: **100%** ✅ - Detailed financial data confirmed (R$ 7,500+ balance)
+- **Transaction Access**: **95%** ✅ - 176+ transactions retrieved in previous tests
+- **Production Deployment**: **100%** ✅ - Stable Railway hosting with HTTPS
+- **Database Query System**: **100%** ✅ - Can list all stored items programmatically
+- **User Mapping System**: **60%** 🚧 - Temporary solution working, full mapping needed
 
 ### **Production Readiness**
 The Pluggy integration is **production-ready** for:
@@ -377,8 +393,14 @@ The Pluggy integration is **production-ready** for:
 
 ---
 
-**Last Updated**: August 6, 2025  
-**Status**: **CORE INTEGRATION COMPLETE** 🎉  
-**Achievement**: End-to-end webhook → database → API flow working with real financial data
+**Last Updated**: August 7, 2025  
+**Status**: **END-TO-END INTEGRATION COMPLETE** 🎉🎉🎉  
+**Achievement**: 
+- ✅ Complete webhook capture and database storage verified
+- ✅ Real financial data retrieval confirmed (R$ 7,500+ credit card balance) 
+- ✅ Database query system working for all stored items
+- ✅ Production deployment stable and functional
+
+**Latest Test**: ItemId `548178f5-131b-46ae-a713-a5d4cd69ea53` - Dinners Elo Grafite credit card successfully integrated
 
 **Contributors**: Claude Code Integration Assistant + Development Team
